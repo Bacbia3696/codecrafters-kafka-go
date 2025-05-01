@@ -23,6 +23,11 @@ func main() {
 	resp := make([]byte, 8)
 	binary.BigEndian.PutUint32(resp[0:4], uint32(0))
 	binary.BigEndian.PutUint32(resp[4:8], uint32(7))
+	_, err = conn.Read(resp)
+	if err != nil {
+		fmt.Println("Error reading response: ", err.Error())
+		os.Exit(1)
+	}
 	_, err = conn.Write(resp)
 	if err != nil {
 		fmt.Println("Error writing response: ", err.Error())

@@ -1,9 +1,16 @@
 package protocol
 
 import (
+	"encoding/binary"
+	"fmt"
 	"reflect"
 	"testing"
 )
+
+func TestFunc(t *testing.T) {
+	a, b := binary.Uvarint([]byte{0x80, 0x01})
+	fmt.Println(a, b)
+}
 
 func TestEncodeVarint(t *testing.T) {
 	tests := []struct {

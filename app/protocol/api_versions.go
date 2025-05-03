@@ -56,10 +56,6 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	binary.BigEndian.PutUint16(buf[offset:offset+ErrorCodeLen], uint16(r.ErrorCode))
 	offset += ErrorCodeLen
 
-	// Encode Body: ThrottleTimeMs (V1+)
-	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
-	offset += ThrottleTimeLen
-
 	// Encode Body: ApiVersions Array Length
 	binary.BigEndian.PutUint32(buf[offset:offset+ArrayLengthLen], uint32(len(r.ApiVersions)))
 	offset += ArrayLengthLen
@@ -73,6 +69,10 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiVersionLen], uint16(version.MaxVersion))
 		offset += ApiVersionLen
 	}
+
+	// Encode Body: ThrottleTimeMs (V1+)
+	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
+	offset += ThrottleTimeLen
 
 	// Write to network
 	_, err := w.Write(buf)

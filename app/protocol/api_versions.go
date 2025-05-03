@@ -12,7 +12,7 @@ import (
 // SupportedApiVersions maps API keys to their version range
 // Key: ApiKey, Value: MaxVersion (minimum is assumed to be 0)
 var SupportedApiVersions = map[int16]int16{
-	ApiKeyApiVersions: 4, // ApiVersions requests - we support up to v4
+	ApiKeyApiVersions: 1, // Respond with V1 structure (includes throttle_time_ms)
 	// Add more API keys as they are implemented
 }
 
@@ -23,22 +23,23 @@ type ApiVersion struct {
 	MaxVersion int16 // In v0 response, this is the only version sent
 }
 
-// ApiVersionsResponseV0 represents the API Versions response v0
-type ApiVersionsResponseV0 struct {
-	ErrorCode   int16
-	ApiVersions []ApiVersion
+// ApiVersionsResponse represents the API Versions response (V1 compatible)
+type ApiVersionsResponse struct {
+	ErrorCode      int16
+	ThrottleTimeMs int32 // Added in V1
+	ApiVersions    []ApiVersion
 }
 
-// Encode writes the ApiVersionsResponseV0 to the writer
-func (r *ApiVersionsResponseV0) Encode(w io.Writer, correlationID int32) error {
-	// Calculate size for v0 response format
-	v0BodySize := int32(ErrorCodeLen + ArrayLengthLen)
+// Encode writes the ApiVersionsResponse (V1 compatible) to the writer
+func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
+	// Calculate body size (V1 format: ErrorCode + ThrottleTimeMs + ApiVersions array)
+	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + ArrayLengthLen)
 	for range r.ApiVersions {
-		v0BodySize += int32(ApiKeyLen + ApiVersionLen) // ApiKey + Version in v0
+		bodySize += int32(ApiKeyLen + ApiVersionLen) // Key + MaxVersion (V0/V1 array item format)
 	}
 
 	headerSize := int32(CorrelationIDLen)
-	messageBodySize := headerSize + v0BodySize
+	messageBodySize := headerSize + bodySize
 	totalBufferSize := MessageSizeLen + messageBodySize
 	buf := make([]byte, totalBufferSize)
 	offset := 0
@@ -54,6 +55,10 @@ func (r *ApiVersionsResponseV0) Encode(w io.Writer, correlationID int32) error {
 	// Encode Body: ErrorCode
 	binary.BigEndian.PutUint16(buf[offset:offset+ErrorCodeLen], uint16(r.ErrorCode))
 	offset += ErrorCodeLen
+
+	// Encode Body: ThrottleTimeMs (V1+)
+	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
+	offset += ThrottleTimeLen
 
 	// Encode Body: ApiVersions Array Length
 	binary.BigEndian.PutUint32(buf[offset:offset+ArrayLengthLen], uint32(len(r.ApiVersions)))
@@ -81,12 +86,9 @@ func (r *ApiVersionsResponseV0) Encode(w io.Writer, correlationID int32) error {
 func HandleApiVersions(conn net.Conn, header RequestHeader) {
 	log.Printf("Handling ApiVersions request (Key %d, Version %d)", header.ApiKey, header.ApiVersion)
 
-	// Check if we support this version
-	if header.ApiVersion != 4 {
-		log.Printf("Unsupported ApiVersions version %d, sending error", header.ApiVersion)
-		SendErrorResponse(conn, header.CorrelationID, ErrorCodeUnsupportedVersion)
-		return
-	}
+	// Note: A real broker would check header.ApiVersion and potentially use
+	// a different response schema if the client requested an older version.
+	// For now, we always respond with V1 structure.
 
 	// Build supported versions from our map
 	keys := make([]int16, 0, len(SupportedApiVersions))
@@ -105,9 +107,10 @@ func HandleApiVersions(conn net.Conn, header RequestHeader) {
 		})
 	}
 
-	response := ApiVersionsResponseV0{
-		ErrorCode:   ErrorCodeNone,
-		ApiVersions: versions,
+	response := ApiVersionsResponse{
+		ErrorCode:      ErrorCodeNone,
+		ThrottleTimeMs: 0, // Set to 0 as required for V1+
+		ApiVersions:    versions,
 	}
 
 	if err := response.Encode(conn, header.CorrelationID); err != nil {

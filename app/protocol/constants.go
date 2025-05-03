@@ -9,6 +9,7 @@ const (
 	ClientIDLen      = 2 // Client ID length prefix in header v1+
 	ErrorCodeLen     = 2 // Error codes are INT16
 	ArrayLengthLen   = 4 // Array length field (INT32)
+	ThrottleTimeLen  = 4 // Throttle time field (INT32) - Present in V1+
 )
 
 // Header field offsets

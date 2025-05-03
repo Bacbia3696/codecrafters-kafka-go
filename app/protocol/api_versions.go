@@ -129,7 +129,7 @@ func HandleApiVersions(conn net.Conn, header RequestHeader) {
 	}
 
 	response := ApiVersionsResponseV3{
-		ErrorCode:      100,
+		ErrorCode:      ErrorCodeNone,
 		ThrottleTimeMs: 0,
 		ApiVersions:    versions,
 	}

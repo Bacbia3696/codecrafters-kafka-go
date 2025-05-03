@@ -35,7 +35,7 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	// Calculate body size (V1 format: ErrorCode + ThrottleTimeMs + ApiVersions array)
 	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + ArrayLengthLen)
 	for range r.ApiVersions {
-		bodySize += int32(ApiKeyLen + ApiVersionLen) // Key + MaxVersion (V0/V1 array item format)
+		bodySize += int32(ApiKeyLen + ApiVersionLen*2) // Key + MaxVersion + MinVersion (V0/V1 array item format)
 	}
 
 	headerSize := int32(CorrelationIDLen)
@@ -64,8 +64,9 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	for _, version := range r.ApiVersions {
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiKeyLen], uint16(version.ApiKey))
 		offset += ApiKeyLen
-
 		// v0 only includes MaxVersion as "Version"
+		binary.BigEndian.PutUint16(buf[offset:offset+ApiVersionLen], uint16(version.MinVersion))
+		offset += ApiVersionLen
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiVersionLen], uint16(version.MaxVersion))
 		offset += ApiVersionLen
 	}

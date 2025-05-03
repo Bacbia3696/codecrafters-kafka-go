@@ -35,7 +35,7 @@ type ApiVersionsResponseV3 struct {
 // Encode writes the ApiVersionsResponse V3 to the writer
 func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	// Calculate body size (V3 format: ErrorCode + ThrottleTimeMs + ApiVersions array + OverallTaggedFields)
-	arrayLenBytes := encodeVarint(int32(len(r.ApiVersions)))
+	arrayLenBytes := encodeVarint(int32(len(r.ApiVersions)) + 1)
 	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + len(arrayLenBytes) + TaggedFieldsLen)
 	for range r.ApiVersions {
 		// Array item V3: ApiKey + MinVersion + MaxVersion + TaggedFields

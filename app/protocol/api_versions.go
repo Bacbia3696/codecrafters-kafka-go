@@ -12,7 +12,8 @@ import (
 // SupportedApiVersions maps API keys to their version range
 // Key: ApiKey, Value: MaxVersion (minimum is assumed to be 0 for the *logic*)
 var SupportedApiVersions = map[int16]int16{
-	ApiKeyApiVersions: 4, // We will respond with V3 structure
+	ApiKeyApiVersions:             4,
+	ApiKeyDescribeTopicPartitions: 0,
 	// Add more API keys as they are implemented
 }
 
@@ -49,7 +50,7 @@ func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
 		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
 	}
 	// SkipTaggedField(r)
-	ReadTaggedField(r)
+	DecodeTaggedField(r)
 	return request, nil
 }
 

@@ -38,12 +38,12 @@ func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
 	} else {
 		h.ClientID = nil
 	}
-	ReadTaggedField(r)
+	DecodeTaggedField(r)
 	return h, nil
 }
 
-func ReadTaggedField(r io.Reader) {
-	tag, err := ReadUvarint(r)
+func DecodeTaggedField(r io.Reader) {
+	tag, err := DecodeUvarint(r)
 	if err != nil {
 		panic("failed to decode tag: " + err.Error())
 	}

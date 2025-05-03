@@ -21,7 +21,7 @@ func encodeVarint(value int32) []byte {
 }
 
 func DecodeCompactString(r io.Reader) (string, error) {
-	length, err := ReadUvarint(r)
+	length, err := DecodeUvarint(r)
 	fmt.Println("length", length)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode compact string length: %w", err)
@@ -56,7 +56,7 @@ func DecodeString(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func ReadUvarint(r io.Reader) (uint64, error) {
+func DecodeUvarint(r io.Reader) (uint64, error) {
 	var x uint64
 	var s uint
 	buf := make([]byte, 1)
@@ -88,4 +88,13 @@ func ReadUvarint(r io.Reader) (uint64, error) {
 	}
 
 	return x, fmt.Errorf("varint overflow")
+}
+
+func DecodeInt32(r io.Reader) (int32, error) {
+	var value int32
+	err := binary.Read(r, binary.BigEndian, &value)
+	if err != nil {
+		return 0, fmt.Errorf("failed to decode int32: %w", err)
+	}
+	return value, nil
 }

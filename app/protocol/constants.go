@@ -13,7 +13,8 @@ const (
 
 // API Keys
 const (
-	ApiKeyApiVersions int16 = 18
+	ApiKeyApiVersions             int16 = 18
+	ApiKeyDescribeTopicPartitions int16 = 75
 	// Add more API keys as needed
 )
 

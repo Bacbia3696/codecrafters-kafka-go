@@ -96,7 +96,7 @@ func (s *Server) acceptConnections(ctx context.Context) {
 }
 
 func (s *Server) handleConnection(log *slog.Logger, conn net.Conn) {
-	defer conn.Close()
+	// defer conn.Close()
 
 	// Create a logger specific to this client connection
 	clientLog := log.With("client_addr", conn.RemoteAddr().String())

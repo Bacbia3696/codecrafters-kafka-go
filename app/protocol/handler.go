@@ -53,32 +53,29 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 			return // Exit loop for this connection on critical error
 		}
 
-		// Launch a goroutine to handle the request body and dispatch
-		go func(currentHeader RequestHeader, bodySizeToHandle int32) {
-			// TODO: Instead of discarding, read the actual request body based on size.
-			//       The actual handler should read the body from 'conn'.
-			//       This discard is temporary until body parsing is implemented per request type.
-			if err := DiscardNBytes(log, conn, int64(bodySizeToHandle)); err != nil {
-				log.Error("Error handling request body in goroutine", "correlationID", currentHeader.CorrelationID, "apiKey", currentHeader.ApiKey, "error", err)
-				// We might not want to close the whole connection here, depends on error type.
-				// For now, just log and let the goroutine exit.
-				return
-			}
+		// Handle body and dispatch sequentially
+		// TODO: Instead of discarding, read the actual request body based on size.
+		if err := DiscardNBytes(log, conn, int64(bodySize)); err != nil {
+			// Reverted error handling: Log all errors from DiscardNBytes as Error
+			log.Error("Error handling request body", "correlationID", header.CorrelationID, "apiKey", header.ApiKey, "error", err)
+			// Decide if we should return here or continue the loop?
+			// Returning seems safer for now if we can't handle the body.
+			return // Exit loop on body handling error
+		}
 
-			// Dispatch based on API Key
-			if handler, ok := ApiHandlers[currentHeader.ApiKey]; ok {
-				// Pass logger, conn, and the captured header
-				handler(log, conn, currentHeader)
-			} else {
-				log.Warn("Unsupported API key in goroutine", "correlationID", currentHeader.CorrelationID, "apiKey", currentHeader.ApiKey)
-				// SendErrorResponse(log, conn, currentHeader.CorrelationID, ErrorCodeUnknownServerError)
-			}
-		}(header, bodySize) // Pass copies of header and bodySize to the goroutine
+		// Dispatch based on API Key
+		if handler, ok := ApiHandlers[header.ApiKey]; ok {
+			// Pass logger, conn, and the header
+			handler(log, conn, header)
+		} else {
+			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)
+			// SendErrorResponse(log, conn, header.CorrelationID, ErrorCodeUnknownServerError)
+		}
 
 	} // End of for loop
 }
 
-// Helper function to discard a specific number of bytes (replace DiscardRemainingRequest)
+// Helper function to discard a specific number of bytes (reverting to previous state)
 func DiscardNBytes(log *slog.Logger, r io.Reader, n int64) error {
 	if n < 0 {
 		return fmt.Errorf("cannot discard negative number of bytes: %d", n)
@@ -88,10 +85,6 @@ func DiscardNBytes(log *slog.Logger, r io.Reader, n int64) error {
 	}
 	written, err := io.CopyN(io.Discard, r, n)
 	if err != nil {
-		if err == io.EOF {
-			log.Error("Connection closed unexpectedly while discarding request body", "expectedBytes", n, "discardedBytes", written)
-			return fmt.Errorf("connection closed unexpectedly while discarding request body: %w", err)
-		}
 		log.Error("Error discarding request body bytes", "error", err, "expectedBytes", n, "discardedBytes", written)
 		return fmt.Errorf("error discarding request body bytes: %w", err)
 	}

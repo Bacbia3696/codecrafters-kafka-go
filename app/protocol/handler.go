@@ -38,7 +38,7 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 		)
 
 		if handler, ok := ApiHandlers[header.ApiKey]; ok {
-			handler(log, conn, header)
+			go handler(log, conn, header)
 		} else {
 			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)
 		}

@@ -12,7 +12,7 @@ import (
 // SupportedApiVersions maps API keys to their version range
 // Key: ApiKey, Value: MaxVersion (minimum is assumed to be 0)
 var SupportedApiVersions = map[int16]int16{
-	ApiKeyApiVersions: 1, // Respond with V1 structure (includes throttle_time_ms)
+	ApiKeyApiVersions: 4,
 	// Add more API keys as they are implemented
 }
 
@@ -37,6 +37,7 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	for range r.ApiVersions {
 		bodySize += int32(ApiKeyLen + ApiVersionLen*2) // Key + MaxVersion + MinVersion (V0/V1 array item format)
 	}
+	fmt.Println("r.ApiVersions", r.ApiVersions)
 
 	headerSize := int32(CorrelationIDLen)
 	messageBodySize := headerSize + bodySize
@@ -107,6 +108,7 @@ func HandleApiVersions(conn net.Conn, header RequestHeader) {
 			MaxVersion: maxVersion,
 		})
 	}
+	fmt.Println("versions", versions)
 
 	response := ApiVersionsResponse{
 		ErrorCode:      ErrorCodeNone,

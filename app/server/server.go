@@ -7,37 +7,38 @@ import (
 	"sync"
 	"time"
 
+	"log/slog"
+
 	"github.com/codecrafters-io/kafka-starter-go/app/config"
-	"github.com/codecrafters-io/kafka-starter-go/app/logger"
 	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
-	"github.com/rs/zerolog"
 )
 
 // Server represents the Kafka server
 type Server struct {
 	config   *config.Config
-	log      zerolog.Logger
+	log      *slog.Logger
 	listener net.Listener
 	wg       sync.WaitGroup
 }
 
 // New creates a new Kafka server instance
-func New(cfg *config.Config) *Server {
+func New(cfg *config.Config, log *slog.Logger) *Server {
 	return &Server{
 		config: cfg,
-		log:    logger.Logger("server"),
+		log:    log,
 	}
 }
 
 // Start starts the Kafka server
 func (s *Server) Start(ctx context.Context) error {
 	var err error
-	s.listener, err = net.Listen("tcp", s.config.Address())
+	addr := s.config.Address()
+	s.listener, err = net.Listen("tcp", addr)
 	if err != nil {
-		return fmt.Errorf("failed to bind to %s: %w", s.config.Address(), err)
+		return fmt.Errorf("failed to bind to %s: %w", addr, err)
 	}
 
-	s.log.Info().Msgf("Kafka server listening on %s", s.config.Address())
+	s.log.Info("Kafka server listening", "address", addr)
 
 	s.wg.Add(1)
 	go s.acceptConnections(ctx)
@@ -62,10 +63,10 @@ func (s *Server) Stop() error {
 
 	select {
 	case <-waitChan:
-		s.log.Info().Msg("All goroutines finished cleanly.")
+		s.log.Info("All goroutines finished cleanly.")
 		return nil // Clean shutdown
 	case <-time.After(10 * time.Second): // Example 10-second timeout
-		s.log.Warn().Msg("Shutdown timed out waiting for connections.")
+		s.log.Warn("Shutdown timed out waiting for connections.")
 		return fmt.Errorf("shutdown timed out")
 	}
 }
@@ -78,9 +79,10 @@ func (s *Server) acceptConnections(ctx context.Context) {
 		if err != nil {
 			select {
 			case <-ctx.Done():
+				s.log.Debug("Context cancelled, stopping accept loop.")
 				return
 			default:
-				s.log.Error().Err(err).Msg("Error accepting connection")
+				s.log.Error("Error accepting connection", "error", err)
 				continue
 			}
 		}
@@ -88,19 +90,21 @@ func (s *Server) acceptConnections(ctx context.Context) {
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
-			s.handleConnection(conn)
+			s.handleConnection(s.log, conn)
 		}()
 	}
 }
 
-func (s *Server) handleConnection(conn net.Conn) {
+func (s *Server) handleConnection(log *slog.Logger, conn net.Conn) {
 	defer conn.Close()
 
-	clientLog := s.log.With().
-		Str("client_addr", conn.RemoteAddr().String()).
-		Logger()
+	// Create a logger specific to this client connection
+	clientLog := log.With("client_addr", conn.RemoteAddr().String())
 
-	clientLog.Debug().Msg("New connection accepted")
+	clientLog.Debug("New connection accepted")
 
-	protocol.HandleConnection(conn)
+	// Pass the client-specific logger to protocol handler
+	protocol.HandleConnection(clientLog, conn)
+
+	clientLog.Debug("Connection closed")
 }

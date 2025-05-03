@@ -12,23 +12,25 @@ import (
 )
 
 func main() {
-	// Initialize logger
-	logger.Setup()
-	log := logger.Logger("main")
+	// Initialize logger using the new package
+	log := logger.New()
+	// slog.SetDefault(log) // SetDefault is still useful if other packages might use slog.Default()
 
 	// Load configuration
 	cfg, err := config.New()
 	if err != nil {
-		log.Fatal().Err(err).Msg("Failed to load configuration")
+		log.Error("Failed to load configuration", "error", err)
+		os.Exit(1)
 	}
 
 	// Create and start server
-	srv := server.New(cfg)
+	srv := server.New(cfg, log) // Pass the configured logger
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	if err := srv.Start(ctx); err != nil {
-		log.Fatal().Err(err).Msg("Failed to start server")
+		log.Error("Failed to start server", "error", err)
+		os.Exit(1)
 	}
 
 	// Handle shutdown gracefully
@@ -36,10 +38,12 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Info().Msg("Shutting down server...")
+	log.Info("Shutting down server...")
 
-	cancel()
+	cancel() // Signal server to stop accepting/handling
 	if err := srv.Stop(); err != nil {
-		log.Error().Err(err).Msg("Error during shutdown")
+		log.Error("Error during server shutdown", "error", err)
 	}
+
+	log.Info("Server shut down completed.")
 }

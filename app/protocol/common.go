@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 )
 
@@ -17,27 +17,32 @@ type RequestHeader struct {
 }
 
 // ParseRequestHeader reads and parses the request header from a connection
-func ParseRequestHeader(conn net.Conn) (RequestHeader, uint32, error) {
+// Accepts a logger for debugging.
+func ParseRequestHeader(log *slog.Logger, conn net.Conn) (RequestHeader, uint32, error) {
 	// 1. Read Message Size
 	var sizeBuf [MessageSizeLen]byte
 	if _, err := io.ReadFull(conn, sizeBuf[:]); err != nil {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			log.Warn("Connection closed before message size received", "error", err)
 			return RequestHeader{}, 0, fmt.Errorf("connection closed before message size received: %w", err)
 		}
+		log.Error("Error reading message size", "error", err)
 		return RequestHeader{}, 0, fmt.Errorf("error reading message size: %w", err)
 	}
 
 	totalSize := binary.BigEndian.Uint32(sizeBuf[:])
-	log.Printf("Received request of size %d from %s", totalSize, conn.RemoteAddr())
+	log.Debug("Received request size", "size", totalSize)
 
 	// Check if size is reasonable
 	if totalSize < RequestHeaderMinLen {
+		log.Error("Request size too small for header", "size", totalSize, "minHeaderSize", RequestHeaderMinLen)
 		return RequestHeader{}, 0, fmt.Errorf("request size %d is too small for minimum header", totalSize)
 	}
 
 	// 2. Read the minimum header
 	headerBuf := make([]byte, RequestHeaderMinLen)
 	if _, err := io.ReadFull(conn, headerBuf); err != nil {
+		log.Error("Error reading request header", "error", err)
 		return RequestHeader{}, 0, fmt.Errorf("error reading request header: %w", err)
 	}
 
@@ -52,14 +57,16 @@ func ParseRequestHeader(conn net.Conn) (RequestHeader, uint32, error) {
 }
 
 // DiscardRemainingRequest reads and discards the remaining bytes in a request after the header
-func DiscardRemainingRequest(conn net.Conn, totalSize uint32) error {
+// Accepts a logger for debugging.
+func DiscardRemainingRequest(log *slog.Logger, conn net.Conn, totalSize uint32) error {
 	bytesRemaining := int64(totalSize) - int64(RequestHeaderMinLen)
 	if bytesRemaining <= 0 {
 		return nil
 	}
 
-	log.Printf("Discarding %d remaining request bytes", bytesRemaining)
+	log.Debug("Discarding remaining request bytes", "count", bytesRemaining)
 	if _, err := io.CopyN(io.Discard, conn, bytesRemaining); err != nil {
+		log.Error("Error discarding remaining request bytes", "error", err)
 		return fmt.Errorf("error reading rest of request payload: %w", err)
 	}
 	return nil

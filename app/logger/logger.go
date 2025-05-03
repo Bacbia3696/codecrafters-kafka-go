@@ -1,27 +1,48 @@
 package logger
 
 import (
+	"log/slog"
 	"os"
-	"time"
-
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
+	"strings"
 )
 
-// Setup initializes the global logger with the given configuration
-func Setup() {
-	// Configure zerolog
-	zerolog.TimeFieldFormat = time.RFC3339
-	log.Logger = log.Output(zerolog.ConsoleWriter{
-		Out:        os.Stdout,
-		TimeFormat: time.RFC3339,
-	})
+// DefaultLevel is the log level used if LOG_LEVEL is not set or invalid.
+const DefaultLevel = slog.LevelInfo
 
-	// Set global level to debug in development
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+// New initializes a new slog.Logger with configuration from environment variables.
+func New() *slog.Logger {
+	levelStr := os.Getenv("LOG_LEVEL")
+	level := parseLevel(levelStr)
+
+	opts := &slog.HandlerOptions{
+		Level:     level,
+		AddSource: true, // Uncomment to include source file and line number
+	}
+
+	// handler := slog.NewTextHandler(os.Stderr, opts)
+	// Alternatively, use JSONHandler:
+	handler := slog.NewJSONHandler(os.Stderr, opts)
+
+	logger := slog.New(handler)
+	return logger
 }
 
-// Logger returns a new logger instance with the given component name
-func Logger(component string) zerolog.Logger {
-	return log.With().Str("component", component).Logger()
+// parseLevel converts a string level (e.g., "debug", "info") to slog.Level.
+func parseLevel(levelStr string) slog.Level {
+	switch strings.ToLower(levelStr) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error", "err":
+		return slog.LevelError
+	default:
+		if levelStr != "" {
+			// Log a warning using the default logger if the level is invalid?
+			// Or just silently use the default. Let's be silent for now.
+		}
+		return DefaultLevel
+	}
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"sort"
 )
@@ -104,15 +104,19 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	return nil
 }
 
-// HandleApiVersions handles the ApiVersions request
-func HandleApiVersions(conn net.Conn, header RequestHeader) {
-	log.Printf("Handling ApiVersions request (Key %d, Version %d)", header.ApiKey, header.ApiVersion)
+// HandleApiVersions handles the ApiVersions request, using the provided logger
+func HandleApiVersions(log *slog.Logger, conn net.Conn, header RequestHeader) {
+	log.Info("Handling ApiVersions request", "apiKey", header.ApiKey, "apiVersion", header.ApiVersion)
 
-	if header.ApiVersion != 4 {
+	if header.ApiVersion != 4 { // Assuming we only support V4 requests for V3 response format
+		log.Warn("Unsupported ApiVersion requested", "requestedVersion", header.ApiVersion)
 		response := ApiVersionsResponseV3{
 			ErrorCode: ErrorCodeUnsupportedVersion,
 		}
-		response.Encode(conn, header.CorrelationID)
+		// Log error from encode?
+		if err := response.Encode(conn, header.CorrelationID); err != nil {
+			log.Error("Error sending unsupported version response", "error", err)
+		}
 		return
 	}
 
@@ -139,10 +143,10 @@ func HandleApiVersions(conn net.Conn, header RequestHeader) {
 		ApiVersions:    versions,
 	}
 
-	log.Printf("Sending ApiVersions response V3: %+v", response)
+	log.Debug("Sending ApiVersions response", "response", response) // Use Debug level for full response
 	if err := response.Encode(conn, header.CorrelationID); err != nil {
-		log.Printf("Error sending ApiVersions response: %v", err)
+		log.Error("Error sending ApiVersions response", "error", err)
 	} else {
-		log.Printf("Successfully sent ApiVersions response")
+		log.Info("Successfully sent ApiVersions response")
 	}
 }

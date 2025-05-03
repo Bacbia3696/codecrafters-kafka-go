@@ -1,12 +1,12 @@
 package protocol
 
 import (
-	"log"
+	"log/slog"
 	"net"
 )
 
 // RequestHandlerFunc defines the function signature for API handlers
-type RequestHandlerFunc func(conn net.Conn, header RequestHeader)
+type RequestHandlerFunc func(log *slog.Logger, conn net.Conn, header RequestHeader)
 
 // API handlers map
 var ApiHandlers = map[int16]RequestHandlerFunc{
@@ -14,31 +14,40 @@ var ApiHandlers = map[int16]RequestHandlerFunc{
 	// Add more handlers as they are implemented
 }
 
-// HandleConnection processes a Kafka protocol connection
-func HandleConnection(conn net.Conn) {
-	defer conn.Close()
-	log.Printf("Connection accepted from %s", conn.RemoteAddr())
+// HandleConnection processes a Kafka protocol connection, using the provided logger
+func HandleConnection(log *slog.Logger, conn net.Conn) {
+	// No need to close here, it's handled by the caller (server.handleConnection)
+	// defer conn.Close()
+	log.Debug("Processing connection") // Already logged acceptance in server.go
 
-	// Parse the request header
-	header, totalSize, err := ParseRequestHeader(conn)
+	// Parse the request header, passing the logger
+	header, totalSize, err := ParseRequestHeader(log, conn)
 	if err != nil {
-		log.Printf("Error parsing request header: %v", err)
+		// ParseRequestHeader already logged the error
 		return
 	}
-	log.Printf("Received request: ApiKey=%d, ApiVersion=%d, CorrelationID=%d",
-		header.ApiKey, header.ApiVersion, header.CorrelationID)
+	log.Debug("Received request",
+		"apiKey", header.ApiKey,
+		"apiVersion", header.ApiVersion,
+		"correlationID", header.CorrelationID,
+		"size", totalSize,
+	)
 
-	// Discard the rest of the request (if any)
-	if err := DiscardRemainingRequest(conn, totalSize); err != nil {
-		log.Printf("Error processing request: %v", err)
+	// Discard the rest of the request (if any), passing the logger
+	// TODO: Instead of discarding, read the actual request body based on size
+	if err := DiscardRemainingRequest(log, conn, totalSize); err != nil {
+		// DiscardRemainingRequest already logged the error
 		return
 	}
 
 	// Dispatch based on API Key
 	if handler, ok := ApiHandlers[header.ApiKey]; ok {
-		handler(conn, header)
+		handler(log, conn, header) // Pass logger to handler
 	} else {
-		// Unknown API Key - Send Error Response
-		log.Panicf("Unsupported API key %d. Sending error response.", header.ApiKey)
+		// Unknown API Key - Send Error Response?
+		// For now, just log. Sending response should probably happen here.
+		log.Warn("Unsupported API key", "apiKey", header.ApiKey)
+		// Sending an error response might be better than panicking
+		// SendErrorResponse(log, conn, header.CorrelationID, ErrorCodeUnknownServerError)
 	}
 }

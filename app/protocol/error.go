@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 )
 
@@ -14,17 +14,18 @@ type ErrorResponse struct {
 	ErrorCode     int16
 }
 
-// SendErrorResponse sends an error response to the client
-func SendErrorResponse(conn net.Conn, correlationID int32, errorCode int16) error {
+// SendErrorResponse sends an error response to the client, using the provided logger.
+func SendErrorResponse(log *slog.Logger, conn net.Conn, correlationID int32, errorCode int16) error {
 	resp := ErrorResponse{
 		CorrelationID: correlationID,
 		ErrorCode:     errorCode,
 	}
-	return resp.Encode(conn)
+	return resp.Encode(log, conn)
 }
 
 // Encode writes the error response (message size, header correlationID, body errorCode) to the writer.
-func (r *ErrorResponse) Encode(w io.Writer) error {
+// Accepts a logger for debugging.
+func (r *ErrorResponse) Encode(log *slog.Logger, w io.Writer) error {
 	headerSize := int32(CorrelationIDLen)
 	bodySize := int32(ErrorCodeLen)
 	messageBodySize := headerSize + bodySize // Size field refers to header + body
@@ -42,13 +43,15 @@ func (r *ErrorResponse) Encode(w io.Writer) error {
 
 	// Encode Body Error Code
 	binary.BigEndian.PutUint16(buf[offset:offset+ErrorCodeLen], uint16(r.ErrorCode))
+	offset += ErrorCodeLen // Corrected offset increment
 
 	// Write to network
 	_, err := w.Write(buf)
 	if err != nil {
+		log.Error("Failed to write error response", "error", err)
 		return fmt.Errorf("failed to write error response: %w", err)
 	}
 
-	log.Printf("Sent error response with code %d", r.ErrorCode)
+	log.Info("Sent error response", "correlationID", r.CorrelationID, "errorCode", r.ErrorCode)
 	return nil
 }

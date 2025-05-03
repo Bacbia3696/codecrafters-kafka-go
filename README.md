@@ -1,3 +1,9 @@
+# Build Your Own Kafka (Go)
+
+This repository contains a Go implementation for the CodeCrafters "Build Your Own Kafka" challenge.
+
+The goal is to build a toy Kafka clone capable of handling basic Kafka protocol requests.
+
 [![progress-banner](https://backend.codecrafters.io/progress/kafka/8d73ea99-e90b-4704-9adc-09a12fab7d5a)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
 
 This is a starting point for Go solutions to the
@@ -11,24 +17,11 @@ about handling the network protocol, event loops, TCP sockets and more.
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
 
-# Passing the first stage
+# Implemented Features
 
-The entry point for your Kafka implementation is in `app/main.go`. Study and
-uncomment the relevant code, and push your changes to pass the first stage:
+*   **Network Layer**: Sets up a TCP server to listen for incoming connections.
+*   **Protocol Handling**: Decodes basic Kafka request headers (size, apiKey, apiVersion, correlationID, clientID).
+*   **API Requests**:
+    *   **APIVersions (ApiKey 18)**: Responds with the supported API versions.
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
-```
-
-That's all!
-
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `go (1.24)` installed locally
-1. Run `./your_program.sh` to run your Kafka broker, which is implemented in
-   `app/main.go`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+Currently, only the `APIVersions` request is implemented. Further requests (like Fetch, Produce, Metadata) would need to be added to the `ApiHandlers` map in `app/protocol/handler.go` and corresponding handler functions created.

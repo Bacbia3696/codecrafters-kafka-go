@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"encoding/binary"
+	"bufio"
 	"fmt"
 	"io"
 )
@@ -13,19 +13,32 @@ type RequestHeader struct {
 	ClientID      *string
 }
 
-func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
+func DecodeRequestHeader(r *bufio.Reader) (*RequestHeader, error) {
 	h := &RequestHeader{}
-	if err := binary.Read(r, binary.BigEndian, &h.ApiKey); err != nil {
+	var err error
+	h.ApiKey, err = DecodeInt16(r)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode api key: %w", err)
 	}
-	if err := binary.Read(r, binary.BigEndian, &h.ApiVersion); err != nil {
+	h.ApiVersion, err = DecodeInt16(r)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode api version: %w", err)
 	}
-	if err := binary.Read(r, binary.BigEndian, &h.CorrelationID); err != nil {
+	h.CorrelationID, err = DecodeInt32(r)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode correlation id: %w", err)
 	}
-	clientIDLength := int16(0)
-	if err := binary.Read(r, binary.BigEndian, &clientIDLength); err != nil {
+	h.ClientID, err = DecodeNullString(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode client id: %w", err)
+	}
+	DecodeTaggedField(r)
+	return h, nil
+}
+
+func DecodeNullString(r io.Reader) (*string, error) {
+	clientIDLength, err := DecodeInt16(r)
+	if err != nil {
 		return nil, fmt.Errorf("failed to decode client id length: %w", err)
 	}
 	if clientIDLength >= 0 {
@@ -34,20 +47,7 @@ func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
 			return nil, fmt.Errorf("failed to decode client id: %w", err)
 		}
 		clientIDStr := string(clientIDBytes)
-		h.ClientID = &clientIDStr
-	} else {
-		h.ClientID = nil
+		return &clientIDStr, nil
 	}
-	DecodeTaggedField(r)
-	return h, nil
-}
-
-func DecodeTaggedField(r io.Reader) {
-	tag, err := DecodeUvarint(r)
-	if err != nil {
-		panic("failed to decode tag: " + err.Error())
-	}
-	if tag != 0 {
-		panic("tag is not 0")
-	}
+	return nil, nil
 }

@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ type ApiVersionsRequest struct {
 	ClientSoftwareVersion string // compact string
 }
 
-func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
+func DecodeApiVersionsRequest(r *bufio.Reader) (*ApiVersionsRequest, error) {
 	request := &ApiVersionsRequest{}
 	var err error
 	request.ClientSoftwareName, err = DecodeCompactString(r)
@@ -57,7 +58,7 @@ func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
 // Encode writes the ApiVersionsResponse V3 to the writer
 func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	// Calculate body size (V3 format: ErrorCode + ThrottleTimeMs + ApiVersions array + OverallTaggedFields)
-	arrayLenBytes := encodeVarint(int32(len(r.ApiVersions)) + 1)
+	arrayLenBytes := EncodeVarint(int32(len(r.ApiVersions)) + 1)
 	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + len(arrayLenBytes) + TaggedFieldsLen)
 	for range r.ApiVersions {
 		// Array item V3: ApiKey + MinVersion + MaxVersion + TaggedFields
@@ -142,7 +143,8 @@ func HandleApiVersions(log *slog.Logger, conn net.Conn, header *RequestHeader) {
 		return
 	}
 
-	request, err := DecodeApiVersionsRequest(conn)
+	rd := bufio.NewReader(conn)
+	request, err := DecodeApiVersionsRequest(rd)
 	if err != nil {
 		log.Error("Error decoding ApiVersions request", "error", err)
 		return

@@ -1,7 +1,7 @@
 package protocol
 
 import (
-	"encoding/binary"
+	"bufio"
 	"io"
 	"log/slog"
 	"net"
@@ -12,17 +12,16 @@ type RequestHandlerFunc func(log *slog.Logger, conn net.Conn, header *RequestHea
 
 // API handlers map
 var ApiHandlers = map[int16]RequestHandlerFunc{
-	ApiKeyApiVersions: HandleApiVersions,
+	ApiKeyApiVersions:             HandleApiVersions,
+	ApiKeyDescribeTopicPartitions: HandleDescribeTopic,
 	// Add more handlers as they are implemented
 }
 
 // HandleConnection processes a Kafka protocol connection, using the provided logger
 func HandleConnection(log *slog.Logger, conn net.Conn) {
-	log.Debug("Processing connection") // Already logged acceptance in server.go
-
 	for {
-		var length uint32
-		if err := binary.Read(conn, binary.BigEndian, &length); err != nil {
+		length, err := DecodeInt32(conn)
+		if err != nil {
 			if err == io.EOF {
 				log.Debug("Connection closed")
 				return
@@ -30,12 +29,14 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 			log.Error("invalid message length", "error", err)
 			return
 		}
-		header, err := DecodeRequestHeader(conn)
+		rd := bufio.NewReader(conn)
+		header, err := DecodeRequestHeader(rd)
 		if err != nil {
 			log.Error("Error decoding request header", "error", err)
 			return
 		}
 		log.Info("Received request",
+			"length", length,
 			"apiKey", header.ApiKey,
 			"apiVersion", header.ApiVersion,
 			"correlationID", header.CorrelationID,

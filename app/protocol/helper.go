@@ -1,14 +1,15 @@
 package protocol
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
 )
 
-// encodeVarint encodes an int32 into Kafka's unsigned varint format.
+// EncodeVarint encodes an int32 into Kafka's unsigned varint format.
 // Returns the byte slice and the number of bytes written.
-func encodeVarint(value int32) []byte {
+func EncodeVarint(value int32) []byte {
 	var buf []byte
 	// Use unsigned directly for length
 	uv := uint32(value)
@@ -20,9 +21,8 @@ func encodeVarint(value int32) []byte {
 	return buf
 }
 
-func DecodeCompactString(r io.Reader) (string, error) {
+func DecodeCompactString(r *bufio.Reader) (string, error) {
 	length, err := DecodeUvarint(r)
-	fmt.Println("length", length)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode compact string length: %w", err)
 	}
@@ -40,8 +40,7 @@ func DecodeCompactString(r io.Reader) (string, error) {
 }
 
 func DecodeString(r io.Reader) (string, error) {
-	var length int16
-	err := binary.Read(r, binary.BigEndian, &length)
+	length, err := DecodeInt16(r)
 	if err != nil {
 		return "", fmt.Errorf("failed to decode string length: %w", err)
 	}
@@ -56,38 +55,8 @@ func DecodeString(r io.Reader) (string, error) {
 	return string(buf), nil
 }
 
-func DecodeUvarint(r io.Reader) (uint64, error) {
-	var x uint64
-	var s uint
-	buf := make([]byte, 1)
-
-	for i := 0; i < binary.MaxVarintLen64; i++ {
-		n, err := r.Read(buf)
-		if err != nil {
-			if i > 0 && err == io.EOF {
-				err = io.ErrUnexpectedEOF
-			}
-			return x, err
-		}
-		if n != 1 {
-			if i > 0 {
-				return x, io.ErrUnexpectedEOF
-			}
-			return x, io.EOF
-		}
-
-		b := buf[0]
-		if b < 0x80 {
-			if i == binary.MaxVarintLen64-1 && b > 1 {
-				return x, fmt.Errorf("varint overflow")
-			}
-			return x | uint64(b)<<s, nil
-		}
-		x |= uint64(b&0x7f) << s
-		s += 7
-	}
-
-	return x, fmt.Errorf("varint overflow")
+func DecodeUvarint(r *bufio.Reader) (uint64, error) {
+	return binary.ReadUvarint(r)
 }
 
 func DecodeInt32(r io.Reader) (int32, error) {
@@ -97,4 +66,33 @@ func DecodeInt32(r io.Reader) (int32, error) {
 		return 0, fmt.Errorf("failed to decode int32: %w", err)
 	}
 	return value, nil
+}
+
+func DecodeInt16(r io.Reader) (int16, error) {
+	var value int16
+	err := binary.Read(r, binary.BigEndian, &value)
+	if err != nil {
+		return 0, fmt.Errorf("failed to decode int16: %w", err)
+	}
+	return value, nil
+}
+
+func DecodeTaggedField(r *bufio.Reader) {
+	tag, err := DecodeUvarint(r)
+	if err != nil {
+		panic("failed to decode tag: " + err.Error())
+	}
+	if tag != 0 {
+		panic("tag is not 0")
+	}
+}
+
+func PeekNextByte(r *bufio.Reader) (byte, error) {
+	buf := make([]byte, 1)
+	_, err := r.Read(buf)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read next byte: %w", err)
+	}
+	r.UnreadByte()
+	return buf[0], nil
 }

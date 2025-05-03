@@ -1,8 +1,8 @@
 package protocol
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 )
@@ -19,7 +19,7 @@ type DescribeTopicRequest struct {
 	// compact array
 	Topics                 []Topic
 	ResponsePartitionLimit int32
-	Cursor                 Cursor
+	Cursor                 *Cursor
 	// TaggedFields []TaggedField
 }
 
@@ -34,7 +34,7 @@ type Cursor struct {
 	// TaggedFields []TaggedField
 }
 
-func DecodeDescribeTopicRequest(r io.Reader) (*DescribeTopicRequest, error) {
+func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) {
 	request := &DescribeTopicRequest{}
 
 	// 1.parse topics
@@ -42,7 +42,10 @@ func DecodeDescribeTopicRequest(r io.Reader) (*DescribeTopicRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode array length: %w", err)
 	}
-	topics := make([]Topic, numTopic)
+	if numTopic == 0 {
+		return nil, fmt.Errorf("invalid number of topics: %d", numTopic)
+	}
+	topics := make([]Topic, numTopic-1)
 	for i := range topics {
 		name, err := DecodeCompactString(r)
 		if err != nil {
@@ -61,6 +64,7 @@ func DecodeDescribeTopicRequest(r io.Reader) (*DescribeTopicRequest, error) {
 	request.ResponsePartitionLimit = responsePartitionLimit
 
 	// 3.parse cursor
+	request.Cursor = &Cursor{}
 	request.Cursor.TopicName, err = DecodeCompactString(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode cursor topic name: %w", err)
@@ -76,7 +80,8 @@ func DecodeDescribeTopicRequest(r io.Reader) (*DescribeTopicRequest, error) {
 }
 
 func HandleDescribeTopic(log *slog.Logger, conn net.Conn, header *RequestHeader) {
-	request, err := DecodeDescribeTopicRequest(conn)
+	rd := bufio.NewReader(conn)
+	request, err := DecodeDescribeTopicRequest(rd)
 	if err != nil {
 		log.Error("failed to decode describe topic request", "error", err)
 		return

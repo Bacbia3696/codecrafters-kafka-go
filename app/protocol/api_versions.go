@@ -34,9 +34,9 @@ type ApiVersionsResponseV3 struct {
 
 // Encode writes the ApiVersionsResponse V3 to the writer
 func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
-	// Calculate body size (V3 format: ErrorCode + ApiVersions array + ThrottleTimeMs + TaggedFields)
-	// Let's recalculate based on the likely flexible order: ErrorCode + ThrottleTimeMs + ArrayLength + ArrayItems + OverallTaggedFields
-	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + ArrayLengthLen + TaggedFieldsLen)
+	// Calculate body size (V3 format: ErrorCode + ThrottleTimeMs + ApiVersions array + OverallTaggedFields)
+	arrayLenBytes := encodeVarint(int32(len(r.ApiVersions)))
+	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + len(arrayLenBytes) + TaggedFieldsLen)
 	for range r.ApiVersions {
 		// Array item V3: ApiKey + MinVersion + MaxVersion + TaggedFields
 		bodySize += int32(ApiKeyLen + ApiVersionLen + ApiVersionLen + TaggedFieldsLen)
@@ -66,9 +66,9 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
 	offset += ThrottleTimeLen
 
-	// Encode Body: ApiVersions Array Length
-	binary.BigEndian.PutUint32(buf[offset:offset+ArrayLengthLen], uint32(len(r.ApiVersions)))
-	offset += ArrayLengthLen
+	// Encode Body: ApiVersions Array Length (UNSIGNED_VARINT)
+	copy(buf[offset:], arrayLenBytes)
+	offset += len(arrayLenBytes)
 
 	// Encode Body: ApiVersions Array Elements (V3 format)
 	for _, version := range r.ApiVersions {

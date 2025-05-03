@@ -64,3 +64,17 @@ func DiscardRemainingRequest(conn net.Conn, totalSize uint32) error {
 	}
 	return nil
 }
+
+// encodeVarint encodes an int32 into Kafka's unsigned varint format.
+// Returns the byte slice and the number of bytes written.
+func encodeVarint(value int32) []byte {
+	var buf []byte
+	// Use unsigned directly for length
+	uv := uint32(value)
+	for uv >= 0x80 {
+		buf = append(buf, byte(uv)|0x80)
+		uv >>= 7
+	}
+	buf = append(buf, byte(uv))
+	return buf
+}

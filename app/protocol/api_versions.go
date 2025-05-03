@@ -108,7 +108,7 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 func HandleApiVersions(conn net.Conn, header RequestHeader) {
 	log.Printf("Handling ApiVersions request (Key %d, Version %d)", header.ApiKey, header.ApiVersion)
 
-	if header.ApiKey != 4 {
+	if header.ApiVersion != 4 {
 		response := ApiVersionsResponseV3{
 			ErrorCode: ErrorCodeUnsupportedVersion,
 		}

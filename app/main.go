@@ -38,7 +38,7 @@ func main() {
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	<-sigChan
-	log.Info("Shutting down server...")
+	log.Info("Received shutdown signal")
 
 	cancel() // Signal server to stop accepting/handling
 	if err := srv.Stop(); err != nil {

@@ -106,5 +106,5 @@ func (s *Server) handleConnection(log *slog.Logger, conn net.Conn) {
 	// Pass the client-specific logger to protocol handler
 	protocol.HandleConnection(clientLog, conn)
 
-	clientLog.Debug("Connection closed")
+	clientLog.Info("Client disconnected")
 }

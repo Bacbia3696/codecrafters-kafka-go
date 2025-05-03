@@ -17,7 +17,7 @@ func main() {
 	// slog.SetDefault(log) // SetDefault is still useful if other packages might use slog.Default()
 
 	// Load configuration
-	cfg, err := config.New()
+	cfg, err := config.New(log)
 	if err != nil {
 		log.Error("Failed to load configuration", "error", err)
 		os.Exit(1)

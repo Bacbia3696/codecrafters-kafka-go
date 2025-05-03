@@ -6,7 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"sort"
+	"slices"
 )
 
 // SupportedApiVersions maps API keys to their version range
@@ -125,7 +125,7 @@ func HandleApiVersions(log *slog.Logger, conn net.Conn, header RequestHeader) {
 	for k := range SupportedApiVersions {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	slices.Sort(keys)
 
 	versions := make([]ApiVersion, 0, len(SupportedApiVersions))
 	for _, apiKey := range keys {

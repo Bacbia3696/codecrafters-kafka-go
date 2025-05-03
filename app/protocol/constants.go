@@ -33,5 +33,4 @@ const (
 const (
 	ErrorCodeNone               int16 = 0
 	ErrorCodeUnsupportedVersion int16 = 35
-	ErrorCodeUnknownServerError int16 = -1
 )

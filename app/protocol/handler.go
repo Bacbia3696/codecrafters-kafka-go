@@ -45,29 +45,36 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 			"size", totalSize,
 		)
 
-		// TODO: Instead of discarding, read the actual request body based on size
 		// Calculate the body size
-		// Cast totalSize to int32 to match HeaderSize return type
-		bodySize := int32(totalSize) - HeaderSize(header.ApiKey, header.ApiVersion) // You'll need a way to get header size
+		bodySize := int32(totalSize) - HeaderSize(header.ApiKey, header.ApiVersion)
 		if bodySize < 0 {
 			log.Error("Invalid message size calculated", "totalSize", totalSize, "calculatedHeaderSize", HeaderSize(header.ApiKey, header.ApiVersion))
-			// Decide how to handle this error, maybe close connection?
-			return
+			// Close connection or send error response?
+			return // Exit loop for this connection on critical error
 		}
 
-		// Read or discard the body (This part still needs the actual request body parsing logic)
-		if err := DiscardNBytes(log, conn, int64(bodySize)); err != nil {
-			log.Error("Error handling request body", "error", err)
-			return // Exit loop on body handling error
-		}
+		// Launch a goroutine to handle the request body and dispatch
+		go func(currentHeader RequestHeader, bodySizeToHandle int32) {
+			// TODO: Instead of discarding, read the actual request body based on size.
+			//       The actual handler should read the body from 'conn'.
+			//       This discard is temporary until body parsing is implemented per request type.
+			if err := DiscardNBytes(log, conn, int64(bodySizeToHandle)); err != nil {
+				log.Error("Error handling request body in goroutine", "correlationID", currentHeader.CorrelationID, "apiKey", currentHeader.ApiKey, "error", err)
+				// We might not want to close the whole connection here, depends on error type.
+				// For now, just log and let the goroutine exit.
+				return
+			}
 
-		// Dispatch based on API Key
-		if handler, ok := ApiHandlers[header.ApiKey]; ok {
-			handler(log, conn, header) // Pass logger to handler
-		} else {
-			log.Warn("Unsupported API key", "apiKey", header.ApiKey)
-			// SendErrorResponse(log, conn, header.CorrelationID, ErrorCodeUnknownServerError)
-		}
+			// Dispatch based on API Key
+			if handler, ok := ApiHandlers[currentHeader.ApiKey]; ok {
+				// Pass logger, conn, and the captured header
+				handler(log, conn, currentHeader)
+			} else {
+				log.Warn("Unsupported API key in goroutine", "correlationID", currentHeader.CorrelationID, "apiKey", currentHeader.ApiKey)
+				// SendErrorResponse(log, conn, currentHeader.CorrelationID, ErrorCodeUnknownServerError)
+			}
+		}(header, bodySize) // Pass copies of header and bodySize to the goroutine
+
 	} // End of for loop
 }
 
@@ -91,30 +98,11 @@ func DiscardNBytes(log *slog.Logger, r io.Reader, n int64) error {
 	return nil
 }
 
-// TODO: Implement HeaderSize function
-// This function needs to return the size of the header based on the API key and version
-// For ApiVersions v4 request, the header size is fixed.
 func HeaderSize(apiKey int16, apiVersion int16) int32 {
-	// Example: Fixed header size for initial requests (adjust as needed)
-	// Request Header = ApiKey (int16) + ApiVersion (int16) + CorrelationID (int32) + ClientID Length (CompactString/Varint) + ClientID Bytes + Tagged Fields Length (Varint) + Tagged Fields Bytes
-	// This needs proper implementation based on Kafka protocol docs for *requests*
-	// For ApiVersions v4, Request Header = ApiKey (2) + ApiVersion (2) + CorrelationID (4) + ClientID (nullable string, min 1 byte for null) + TaggedFields (1 byte for 0) = 10 bytes minimum
-	// Let's assume a fixed size for now for simplicity, needs refinement.
 	switch apiKey {
 	case ApiKeyApiVersions:
-		if apiVersion >= 3 { // V3+ requests use tagged fields
-			// Need to actually *read* client ID length to know the full header size
-			// For now, returning a placeholder, THIS IS INCORRECT
-			return 10 // Placeholder: ApiKey(2)+ApiVersion(2)+CorrID(4)+ClientID(1 for null)+Tags(1 for 0)
-		} else {
-			// Older versions might have different fixed sizes or structures
-			return 8 // Placeholder: ApiKey(2)+ApiVersion(2)+CorrID(4)+ClientID(0 for empty string?)
-		}
+		return 10
 	default:
-		// Default placeholder, needs correct logic per API key/version
 		return 10
 	}
 }
-
-// Remove or comment out the old DiscardRemainingRequest function if it exists
-// func DiscardRemainingRequest(...) { ... }

@@ -62,12 +62,10 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	binary.BigEndian.PutUint16(buf[offset:offset+ErrorCodeLen], uint16(r.ErrorCode))
 	offset += ErrorCodeLen
 
-	// Encode Body: ThrottleTimeMs (Moved earlier for V3 flexible structure)
-	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
-	offset += ThrottleTimeLen
-
 	// Encode Body: ApiVersions Array Length (UNSIGNED_VARINT)
+	fmt.Printf("debug1: %v, %v\n", arrayLenBytes, buf)
 	copy(buf[offset:], arrayLenBytes)
+	fmt.Printf("debug2: %v, %v\n", arrayLenBytes, buf)
 	offset += len(arrayLenBytes)
 
 	// Encode Body: ApiVersions Array Elements (V3 format)
@@ -85,6 +83,9 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 		buf[offset] = 0 // UNSIGNED_VARINT 0 takes 1 byte
 		offset += TaggedFieldsLen
 	}
+
+	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
+	offset += ThrottleTimeLen
 
 	// Encode Body: Overall Tagged fields (V3+) - sending 0
 	buf[offset] = 0 // UNSIGNED_VARINT 0 takes 1 byte

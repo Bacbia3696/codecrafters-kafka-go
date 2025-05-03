@@ -35,7 +35,8 @@ type ApiVersionsResponseV3 struct {
 // Encode writes the ApiVersionsResponse V3 to the writer
 func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	// Calculate body size (V3 format: ErrorCode + ApiVersions array + ThrottleTimeMs + TaggedFields)
-	bodySize := int32(ErrorCodeLen + ArrayLengthLen + ThrottleTimeLen + TaggedFieldsLen)
+	// Let's recalculate based on the likely flexible order: ErrorCode + ThrottleTimeMs + ArrayLength + ArrayItems + OverallTaggedFields
+	bodySize := int32(ErrorCodeLen + ThrottleTimeLen + ArrayLengthLen + TaggedFieldsLen)
 	for range r.ApiVersions {
 		// Array item V3: ApiKey + MinVersion + MaxVersion + TaggedFields
 		bodySize += int32(ApiKeyLen + ApiVersionLen + ApiVersionLen + TaggedFieldsLen)
@@ -61,6 +62,10 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	binary.BigEndian.PutUint16(buf[offset:offset+ErrorCodeLen], uint16(r.ErrorCode))
 	offset += ErrorCodeLen
 
+	// Encode Body: ThrottleTimeMs (Moved earlier for V3 flexible structure)
+	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
+	offset += ThrottleTimeLen
+
 	// Encode Body: ApiVersions Array Length
 	binary.BigEndian.PutUint32(buf[offset:offset+ArrayLengthLen], uint32(len(r.ApiVersions)))
 	offset += ArrayLengthLen
@@ -69,18 +74,17 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 	for _, version := range r.ApiVersions {
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiKeyLen], uint16(version.ApiKey))
 		offset += ApiKeyLen
+
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiVersionLen], uint16(version.MinVersion))
 		offset += ApiVersionLen
+
 		binary.BigEndian.PutUint16(buf[offset:offset+ApiVersionLen], uint16(version.MaxVersion))
 		offset += ApiVersionLen
+
 		// Tagged fields for array item (V3+) - sending 0
 		buf[offset] = 0 // UNSIGNED_VARINT 0 takes 1 byte
 		offset += TaggedFieldsLen
 	}
-
-	// Encode Body: ThrottleTimeMs (V1+)
-	binary.BigEndian.PutUint32(buf[offset:offset+ThrottleTimeLen], uint32(r.ThrottleTimeMs))
-	offset += ThrottleTimeLen
 
 	// Encode Body: Overall Tagged fields (V3+) - sending 0
 	buf[offset] = 0 // UNSIGNED_VARINT 0 takes 1 byte

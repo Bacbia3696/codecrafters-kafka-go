@@ -46,7 +46,7 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	offset := 0
 
 	// Encode Message Size (size of header + body)
-	binary.BigEndian.PutUint32(buf[offset:offset+MessageSizeLen], uint32(messageBodySize))
+	binary.BigEndian.PutUint32(buf[offset:offset+MessageSizeLen], uint32(totalBufferSize))
 	offset += MessageSizeLen
 
 	// Encode Header: Correlation ID

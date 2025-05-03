@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/binary"
+	"io"
 	"log/slog"
 	"net"
 )
@@ -22,6 +23,10 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 	for {
 		var length uint32
 		if err := binary.Read(conn, binary.BigEndian, &length); err != nil {
+			if err == io.EOF {
+				log.Debug("Connection closed")
+				return
+			}
 			log.Error("invalid message length", "error", err)
 			return
 		}
@@ -38,7 +43,7 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 		)
 
 		if handler, ok := ApiHandlers[header.ApiKey]; ok {
-			go handler(log, conn, header)
+			handler(log, conn, header)
 		} else {
 			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)
 		}

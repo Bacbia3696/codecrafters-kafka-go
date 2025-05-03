@@ -37,7 +37,6 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	for range r.ApiVersions {
 		bodySize += int32(ApiKeyLen + ApiVersionLen*2) // Key + MaxVersion + MinVersion (V0/V1 array item format)
 	}
-	fmt.Println("r.ApiVersions", r.ApiVersions)
 
 	headerSize := int32(CorrelationIDLen)
 	messageBodySize := headerSize + bodySize
@@ -46,7 +45,7 @@ func (r *ApiVersionsResponse) Encode(w io.Writer, correlationID int32) error {
 	offset := 0
 
 	// Encode Message Size (size of header + body)
-	binary.BigEndian.PutUint32(buf[offset:offset+MessageSizeLen], uint32(totalBufferSize))
+	binary.BigEndian.PutUint32(buf[offset:offset+MessageSizeLen], uint32(messageBodySize))
 	offset += MessageSizeLen
 
 	// Encode Header: Correlation ID
@@ -108,7 +107,6 @@ func HandleApiVersions(conn net.Conn, header RequestHeader) {
 			MaxVersion: maxVersion,
 		})
 	}
-	fmt.Println("versions", versions)
 
 	response := ApiVersionsResponse{
 		ErrorCode:      ErrorCodeNone,

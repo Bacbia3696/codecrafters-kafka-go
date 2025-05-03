@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -45,7 +44,6 @@ func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read api versions request: %w", err)
 	}
-	fmt.Printf("binary: %x\n", bb[:n])
 	br := bytes.NewReader(bb[:n])
 	request := &ApiVersionsRequest{}
 	request.ClientSoftwareName, err = DecodeCompactString(br)
@@ -56,11 +54,7 @@ func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
 	}
-	// tagged fields
-	_, err = binary.ReadUvarint(bufio.NewReader(r))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode tagged fields: %w", err)
-	}
+	ReadTaggedField(br)
 	return request, nil
 }
 

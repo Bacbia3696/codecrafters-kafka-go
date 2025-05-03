@@ -30,8 +30,6 @@ func DecodeCompactString(r io.Reader) (string, error) {
 		return "", fmt.Errorf("failed to decode compact string length: %w", err)
 	}
 
-	fmt.Println("length", length)
-	// Kafka uses length + 1, where 0 means empty string.
 	if length <= 1 {
 		return "", nil // Empty string
 	}
@@ -53,7 +51,6 @@ func DecodeString(r io.Reader) (string, error) {
 	if length < 0 {
 		return "", fmt.Errorf("invalid string length: %d", length)
 	}
-	fmt.Println("length", length)
 	buf := make([]byte, length)
 	_, err = io.ReadFull(r, buf)
 	if err != nil {

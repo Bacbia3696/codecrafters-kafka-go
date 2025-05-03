@@ -1,6 +1,7 @@
 package protocol
 
 import (
+	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -28,7 +29,6 @@ func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
 	if err := binary.Read(r, binary.BigEndian, &clientIDLength); err != nil {
 		return nil, fmt.Errorf("failed to decode client id length: %w", err)
 	}
-	fmt.Println("clientIDLength", clientIDLength)
 	if clientIDLength >= 0 {
 		clientIDBytes := make([]byte, clientIDLength)
 		if _, err := io.ReadFull(r, clientIDBytes); err != nil {
@@ -39,5 +39,16 @@ func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
 	} else {
 		h.ClientID = nil
 	}
+	ReadTaggedField(r)
 	return h, nil
+}
+
+func ReadTaggedField(r io.Reader) {
+	tag, err := binary.ReadUvarint(bufio.NewReader(r))
+	if err != nil {
+		panic("failed to decode tag: " + err.Error())
+	}
+	if tag != 0 {
+		panic("tag is not 0")
+	}
 }

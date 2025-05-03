@@ -39,9 +39,6 @@ func HandleConnection(conn net.Conn) {
 		handler(conn, header)
 	} else {
 		// Unknown API Key - Send Error Response
-		log.Printf("Unsupported API key %d. Sending error response.", header.ApiKey)
-		if err := SendErrorResponse(conn, header.CorrelationID, ErrorCodeUnknownServerError); err != nil {
-			log.Printf("Error sending error response: %v", err)
-		}
+		log.Panicf("Unsupported API key %d. Sending error response.", header.ApiKey)
 	}
 }

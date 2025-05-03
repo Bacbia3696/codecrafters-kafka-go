@@ -23,9 +23,7 @@ const (
 	correlationIDOffset = apiVersionOffset + apiVersionLen
 
 	// Specific values for current stage requirements
-	expectedApiVersion          = 4
-	unsupportedVersionErrorCode = 35 // Kafka Error Code: UNSUPPORTED_VERSION
-	errorCodeLen                = 2  // Error codes are INT16
+	errorCodeLen = 2 // Error codes are INT16
 
 	// API Keys
 	ApiVersionsApiKey = 18
@@ -146,7 +144,7 @@ func (r *ErrorResponse) Encode(w io.Writer) error {
 // Define the API versions supported by *this* broker implementation.
 // Key: ApiKey, Value: Max Supported Version (used in V0 response)
 var supportedApiVersions = map[int16]int16{
-	ApiVersionsApiKey: 0, // We support ApiVersions V0 request/response initially
+	ApiVersionsApiKey: 4, // We support ApiVersions V0 request/response initially
 	// Add other supported APIs here as they are implemented, e.g.,
 	// FetchApiKey: 0,
 }
@@ -164,6 +162,17 @@ var apiHandlers = map[int16]requestHandler{
 // handleApiVersions handles the ApiVersions request (Key 18).
 func handleApiVersions(conn net.Conn, header requestHeader) {
 	log.Printf("Handling ApiVersions request (Key %d, Version %d) from %s", header.apiKey, header.apiVersion, conn.RemoteAddr())
+
+	if header.apiVersion != 4 {
+		errResp := ErrorResponse{
+			correlationID: header.correlationID,
+			errorCode:     UnsupportedVersionErrorCode,
+		}
+		if err := errResp.Encode(conn); err != nil {
+			log.Printf("Error sending 'Unsupported API Version' error response to %s: %v", conn.RemoteAddr(), err)
+		}
+		return
+	}
 
 	// Construct the list of supported versions from our map
 	// Sort keys for deterministic order in response (good practice)
@@ -260,7 +269,7 @@ func handleConnection(conn net.Conn) {
 		log.Printf("Unsupported API key %d received from %s. Sending error response.", header.apiKey, conn.RemoteAddr())
 		errorResp := ErrorResponse{
 			correlationID: header.correlationID,
-			errorCode:     UnknownServerErrorCode, // Or specific Kafka code if available like UNSUPPORTED_VERSION (though that's for version mismatch)
+			errorCode:     UnsupportedVersionErrorCode, // Or specific Kafka code if available like UNSUPPORTED_VERSION (though that's for version mismatch)
 		}
 		if err := errorResp.Encode(conn); err != nil {
 			log.Printf("Error sending 'Unknown API Key' error response to %s: %v", conn.RemoteAddr(), err)

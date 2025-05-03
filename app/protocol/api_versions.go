@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -39,22 +38,18 @@ type ApiVersionsRequest struct {
 }
 
 func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
-	bb := make([]byte, 10000)
-	n, err := r.Read(bb)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read api versions request: %w", err)
-	}
-	br := bytes.NewReader(bb[:n])
 	request := &ApiVersionsRequest{}
-	request.ClientSoftwareName, err = DecodeCompactString(br)
+	var err error
+	request.ClientSoftwareName, err = DecodeCompactString(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_name: %w", err)
 	}
-	request.ClientSoftwareVersion, err = DecodeCompactString(br)
+	request.ClientSoftwareVersion, err = DecodeCompactString(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
 	}
-	ReadTaggedField(br)
+	// SkipTaggedField(r)
+	ReadTaggedField(r)
 	return request, nil
 }
 

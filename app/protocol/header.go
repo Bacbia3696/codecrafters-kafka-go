@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"bufio"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -44,7 +43,7 @@ func DecodeRequestHeader(r io.Reader) (*RequestHeader, error) {
 }
 
 func ReadTaggedField(r io.Reader) {
-	tag, err := binary.ReadUvarint(bufio.NewReader(r))
+	tag, err := ReadUvarint(r)
 	if err != nil {
 		panic("failed to decode tag: " + err.Error())
 	}

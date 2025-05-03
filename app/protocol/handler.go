@@ -25,14 +25,18 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 		// Parse the request header, passing the logger
 		header, totalSize, err := ParseRequestHeader(log, conn)
 		if err != nil {
-			// ParseRequestHeader already logged the error.
-			// If it's EOF, the client closed the connection cleanly.
-			if err == io.EOF || errors.Is(err, net.ErrClosed) {
+			// Check for specific errors
+			if errors.Is(err, errConnectionClosedBeforeSize) {
+				// Common case (e.g., health check), log as debug and close connection cleanly
+				log.Debug("Client disconnected before sending data (likely health check)", "error", err)
+			} else if err == io.EOF || errors.Is(err, net.ErrClosed) {
+				// Client closed connection cleanly after at least one successful request
 				log.Debug("Client closed connection")
 			} else {
+				// Unexpected error during header parsing
 				log.Error("Error parsing request header", "error", err)
 			}
-			return // Exit loop on any header parsing error
+			return // Exit loop on any header parsing error or clean disconnect
 		}
 		log.Debug("Received request",
 			"apiKey", header.ApiKey,

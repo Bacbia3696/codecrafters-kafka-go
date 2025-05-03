@@ -2,11 +2,15 @@ package protocol
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"net"
 )
+
+// Specific error for when connection closes before message size is read
+var errConnectionClosedBeforeSize = errors.New("connection closed before message size received")
 
 // RequestHeader represents the common header for all Kafka requests
 type RequestHeader struct {
@@ -23,8 +27,9 @@ func ParseRequestHeader(log *slog.Logger, conn net.Conn) (RequestHeader, uint32,
 	var sizeBuf [MessageSizeLen]byte
 	if _, err := io.ReadFull(conn, sizeBuf[:]); err != nil {
 		if err == io.EOF || err == io.ErrUnexpectedEOF {
-			log.Warn("Connection closed before message size received", "error", err)
-			return RequestHeader{}, 0, fmt.Errorf("connection closed before message size received: %w", err)
+			// Log as Warn here, but return the specific error for the caller to handle
+			// log.Warn("Connection closed before message size received", "error", err) // Removed: Caller handles logging
+			return RequestHeader{}, 0, errConnectionClosedBeforeSize // Return specific error
 		}
 		log.Error("Error reading message size", "error", err)
 		return RequestHeader{}, 0, fmt.Errorf("error reading message size: %w", err)

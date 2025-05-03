@@ -6,22 +6,10 @@ const (
 	ApiKeyLen        = 2 // API key field
 	ApiVersionLen    = 2 // API version field
 	CorrelationIDLen = 4 // Correlation ID field
-	ClientIDLen      = 2 // Client ID length prefix in header v1+
 	ErrorCodeLen     = 2 // Error codes are INT16
-	ArrayLengthLen   = 4 // Array length field (INT32)
 	ThrottleTimeLen  = 4 // Throttle time field (INT32) - Present in V1+
 	TaggedFieldsLen  = 1 // UNSIGNED_VARINT for Tagged Fields count (always 0 for now)
 )
-
-// Header field offsets
-const (
-	ApiKeyOffset        = 0
-	ApiVersionOffset    = ApiKeyOffset + ApiKeyLen
-	CorrelationIDOffset = ApiVersionOffset + ApiVersionLen
-)
-
-// Minimum header size (without client ID, which is variable length)
-const RequestHeaderMinLen = ApiKeyLen + ApiVersionLen + CorrelationIDLen
 
 // API Keys
 const (

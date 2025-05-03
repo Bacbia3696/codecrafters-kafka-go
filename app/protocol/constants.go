@@ -10,6 +10,7 @@ const (
 	ErrorCodeLen     = 2 // Error codes are INT16
 	ArrayLengthLen   = 4 // Array length field (INT32)
 	ThrottleTimeLen  = 4 // Throttle time field (INT32) - Present in V1+
+	TaggedFieldsLen  = 1 // UNSIGNED_VARINT for Tagged Fields count (always 0 for now)
 )
 
 // Header field offsets

@@ -108,8 +108,13 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 func HandleApiVersions(conn net.Conn, header RequestHeader) {
 	log.Printf("Handling ApiVersions request (Key %d, Version %d)", header.ApiKey, header.ApiVersion)
 
-	// Note: A real broker *might* check header.ApiVersion to determine response format.
-	// We are implementing V3 response format here.
+	if header.ApiKey != 4 {
+		response := ApiVersionsResponseV3{
+			ErrorCode: ErrorCodeUnsupportedVersion,
+		}
+		response.Encode(conn, header.CorrelationID)
+		return
+	}
 
 	// Build supported versions from our map
 	keys := make([]int16, 0, len(SupportedApiVersions))

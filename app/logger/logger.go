@@ -4,24 +4,24 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
+
+	"github.com/lmittmann/tint"
 )
 
 // DefaultLevel is the log level used if LOG_LEVEL is not set or invalid.
-const DefaultLevel = slog.LevelInfo
+const DefaultLevel = slog.LevelDebug
 
 // New initializes a new slog.Logger with configuration from environment variables.
 func New() *slog.Logger {
 	levelStr := os.Getenv("LOG_LEVEL")
 	level := parseLevel(levelStr)
 
-	opts := &slog.HandlerOptions{
-		Level:     level,
-		AddSource: true, // Uncomment to include source file and line number
-	}
-
-	handler := slog.NewTextHandler(os.Stderr, opts)
-	// Alternatively, use JSONHandler:
-	// handler := slog.NewJSONHandler(os.Stderr, opts)
+	handler := tint.NewHandler(os.Stderr, &tint.Options{
+		Level:      level,        // Log all levels
+		TimeFormat: time.Kitchen, // Prettier time format
+		AddSource:  true,         // Add source file and line number
+	})
 
 	logger := slog.New(handler)
 	return logger
@@ -40,8 +40,7 @@ func parseLevel(levelStr string) slog.Level {
 		return slog.LevelError
 	default:
 		if levelStr != "" {
-			// Log a warning using the default logger if the level is invalid?
-			// Or just silently use the default. Let's be silent for now.
+			panic("invalid log level: " + levelStr)
 		}
 		return DefaultLevel
 	}

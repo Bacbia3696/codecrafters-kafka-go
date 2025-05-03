@@ -1,6 +1,8 @@
 package protocol
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -30,6 +32,36 @@ type ApiVersionsResponseV3 struct {
 	ThrottleTimeMs int32 // Added in V1
 	ApiVersions    []ApiVersion
 	// TaggedFields omitted, will encode as 0 bytes
+}
+
+type ApiVersionsRequest struct {
+	ClientSoftwareName    string // compact string
+	ClientSoftwareVersion string // compact string
+}
+
+func DecodeApiVersionsRequest(r io.Reader) (*ApiVersionsRequest, error) {
+	bb := make([]byte, 10000)
+	n, err := r.Read(bb)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read api versions request: %w", err)
+	}
+	fmt.Printf("binary: %x\n", bb[:n])
+	br := bytes.NewReader(bb[:n])
+	request := &ApiVersionsRequest{}
+	request.ClientSoftwareName, err = DecodeCompactString(br)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode client_software_name: %w", err)
+	}
+	request.ClientSoftwareVersion, err = DecodeCompactString(br)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
+	}
+	// tagged fields
+	_, err = binary.ReadUvarint(bufio.NewReader(r))
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode tagged fields: %w", err)
+	}
+	return request, nil
 }
 
 // Encode writes the ApiVersionsResponse V3 to the writer
@@ -105,7 +137,7 @@ func (r *ApiVersionsResponseV3) Encode(w io.Writer, correlationID int32) error {
 }
 
 // HandleApiVersions handles the ApiVersions request, using the provided logger
-func HandleApiVersions(log *slog.Logger, conn net.Conn, header RequestHeader) {
+func HandleApiVersions(log *slog.Logger, conn net.Conn, header *RequestHeader) {
 	log.Info("Handling ApiVersions request", "apiKey", header.ApiKey, "apiVersion", header.ApiVersion)
 
 	if header.ApiVersion != 4 { // Assuming we only support V4 requests for V3 response format
@@ -119,6 +151,13 @@ func HandleApiVersions(log *slog.Logger, conn net.Conn, header RequestHeader) {
 		}
 		return
 	}
+
+	request, err := DecodeApiVersionsRequest(conn)
+	if err != nil {
+		log.Error("Error decoding ApiVersions request", "error", err)
+		return
+	}
+	log.Debug("Received ApiVersions request", "clientSoftwareName", request.ClientSoftwareName, "clientSoftwareVersion", request.ClientSoftwareVersion)
 
 	// Build supported versions from our map
 	keys := make([]int16, 0, len(SupportedApiVersions))

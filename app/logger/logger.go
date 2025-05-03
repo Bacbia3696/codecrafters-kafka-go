@@ -19,9 +19,9 @@ func New() *slog.Logger {
 		AddSource: true, // Uncomment to include source file and line number
 	}
 
-	// handler := slog.NewTextHandler(os.Stderr, opts)
+	handler := slog.NewTextHandler(os.Stderr, opts)
 	// Alternatively, use JSONHandler:
-	handler := slog.NewJSONHandler(os.Stderr, opts)
+	// handler := slog.NewJSONHandler(os.Stderr, opts)
 
 	logger := slog.New(handler)
 	return logger

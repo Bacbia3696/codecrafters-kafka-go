@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"io"
 	"log/slog"
@@ -37,8 +38,11 @@ func HandleConnection(log *slog.Logger, conn net.Conn, handlers map[int16]Reques
 			"clientID", header.ClientID,
 		)
 
+		var bufWriter = bytes.Buffer{}
 		if handler, ok := handlers[header.ApiKey]; ok {
-			handler(log, rd, conn, header)
+			handler(log, rd, &bufWriter, header)
+			EncodeValue(conn, int32(bufWriter.Len()))
+			bufWriter.WriteTo(conn)
 		} else {
 			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)
 		}

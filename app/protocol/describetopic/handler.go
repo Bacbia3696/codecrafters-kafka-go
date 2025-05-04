@@ -2,7 +2,6 @@ package describetopic
 
 import (
 	"bufio"
-	"bytes"
 	"io"
 	"log/slog"
 
@@ -18,7 +17,7 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		return
 	}
 	log.Info("Received DescribeTopic request", "topics", request.Topics, "responsePartitionLimit", request.ResponsePartitionLimit, "cursor", request.Cursor)
-	responseHeader := &protocol.ResponseHeader{
+	responseHeader := &protocol.ResponseHeaderV1{
 		CorrelationID: header.CorrelationID,
 	}
 	response := &DescribeTopicResponse{
@@ -26,6 +25,12 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		Topics:       make([]TopicResponse, len(request.Topics)),
 		NextCursor:   nil,
 	}
+	// metadata, err := protocol.ReadClusterMetadata()
+	// if err != nil {
+	// 	log.Error("failed to read cluster metadata", "error", err)
+	// 	return
+	// }
+	// log.Info("Cluster metadata", "metadata", metadata)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
 			ErrorCode:  protocol.ErrorCodeUnknownTopic,
@@ -36,30 +41,15 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		}
 	}
 
-	var buf bytes.Buffer
-	err = responseHeader.Encode(&buf)
+	err = responseHeader.Encode(writer)
 	if err != nil {
 		log.Error("failed to encode describe topic response header", "error", err)
 		return
 	}
-	err = response.Encode(&buf)
+	err = response.Encode(writer)
 	if err != nil {
-		log.Error("failed to encode describe topic response to buffer", "error", err)
+		log.Error("failed to encode describe topic response", "error", err)
 		return
 	}
-
-	bytesWritten := buf.Len()
-
-	err = protocol.EncodeI32(writer, int32(bytesWritten))
-	if err != nil {
-		log.Error("failed to encode describe topic response length", "error", err)
-		return
-	}
-	_, err = buf.WriteTo(writer)
-	if err != nil {
-		log.Error("failed to write describe topic response buffer to writer", "error", err)
-		return
-	}
-
-	log.Info("Sent DescribeTopic response", "response", response, "bytesWritten", bytesWritten)
+	log.Info("Sent DescribeTopic response", "response", response)
 }

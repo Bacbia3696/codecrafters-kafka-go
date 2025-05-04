@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"reflect"
 )
 
 type RequestHeader struct {
@@ -13,13 +14,25 @@ type RequestHeader struct {
 	ClientID      *string
 }
 
-type ResponseHeader struct {
+type ResponseHeaderV0 struct {
+	CorrelationID int32
+}
+
+type ResponseHeaderV1 struct {
 	CorrelationID int32
 	// tagged fields
 }
 
-func (r *ResponseHeader) Encode(w io.Writer) error {
-	err := EncodeI32(w, r.CorrelationID)
+func (r *ResponseHeaderV0) Encode(w io.Writer) error {
+	err := EncodeValue(w, r.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("failed to encode correlation id: %w", err)
+	}
+	return nil
+}
+
+func (r *ResponseHeaderV1) Encode(w io.Writer) error {
+	err := EncodeValue(w, r.CorrelationID)
 	if err != nil {
 		return fmt.Errorf("failed to encode correlation id: %w", err)
 	}
@@ -63,4 +76,23 @@ func DecodeNullString(r io.Reader) (*string, error) {
 		return &clientIDStr, nil
 	}
 	return nil, nil
+}
+
+func EncodeArray(w io.Writer, array any) error {
+	// check if array is a slice
+	if reflect.ValueOf(array).Kind() != reflect.Slice {
+		return fmt.Errorf("array is not a slice")
+	}
+	slice := reflect.ValueOf(array)
+	err := EncodeUvarint(w, uint64(slice.Len()+1))
+	if err != nil {
+		return fmt.Errorf("failed to encode array length: %w", err)
+	}
+	for i := 0; i < slice.Len(); i++ {
+		err := EncodeValue(w, slice.Index(i).Interface())
+		if err != nil {
+			return fmt.Errorf("failed to encode array value: %w", err)
+		}
+	}
+	return nil
 }

@@ -23,5 +23,6 @@ about handling the network protocol, event loops, TCP sockets and more.
 *   **Protocol Handling**: Decodes basic Kafka request headers (size, apiKey, apiVersion, correlationID, clientID).
 *   **API Requests**:
     *   **APIVersions (ApiKey 18)**: Responds with the supported API versions.
+    *   **Describe topic (ApiKey 75)**: 
 
 Currently, only the `APIVersions` request is implemented. Further requests (like Fetch, Produce, Metadata) would need to be added to the `ApiHandlers` map in `app/protocol/handler.go` and corresponding handler functions created.

@@ -11,7 +11,16 @@ import (
 
 	"github.com/codecrafters-io/kafka-starter-go/app/config"
 	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/apiversions"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/describetopic"
 )
+
+// ApiHandlers maps API keys to their respective handlers
+var ApiHandlers = map[int16]protocol.RequestHandlerFunc{
+	protocol.ApiKeyApiVersions:             apiversions.HandleApiVersions,
+	protocol.ApiKeyDescribeTopicPartitions: describetopic.HandleDescribeTopic,
+	// Add more handlers as they are implemented
+}
 
 // Server represents the Kafka server
 type Server struct {
@@ -103,8 +112,14 @@ func (s *Server) handleConnection(log *slog.Logger, conn net.Conn) {
 
 	clientLog.Debug("New connection accepted")
 
-	// Pass the client-specific logger to protocol handler
-	protocol.HandleConnection(clientLog, conn)
+	// Create a map with the exact type expected by HandleConnection
+	handlersForCall := make(map[int16]protocol.RequestHandlerFunc)
+	for apiKey, handlerFunc := range ApiHandlers {
+		handlersForCall[apiKey] = handlerFunc
+	}
+
+	// Pass the client-specific logger and correctly typed handlers to protocol handler
+	protocol.HandleConnection(clientLog, conn, handlersForCall)
 
 	clientLog.Info("Client disconnected")
 }

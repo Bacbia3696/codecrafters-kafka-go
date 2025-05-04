@@ -21,5 +21,6 @@ const (
 // Error Codes
 const (
 	ErrorCodeNone               int16 = 0
+	ErrorCodeUnknownTopic       int16 = 3
 	ErrorCodeUnsupportedVersion int16 = 35
 )

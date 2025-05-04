@@ -1,10 +1,10 @@
-package protocol
+package describetopic
 
 import (
 	"bufio"
 	"fmt"
-	"log/slog"
-	"net"
+
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
 )
 
 // DescribeTopicPartitions Request (Version: 0) => [topics] response_partition_limit cursor _tagged_fields
@@ -20,7 +20,7 @@ type DescribeTopicRequest struct {
 	Topics                 []Topic
 	ResponsePartitionLimit int32
 	Cursor                 *Cursor
-	// TaggedFields []TaggedField
+	// TaggedFields []TaggedField // Assuming TaggedField is defined elsewhere or not needed for decoding
 }
 
 type Topic struct {
@@ -38,7 +38,7 @@ func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) 
 	request := &DescribeTopicRequest{}
 
 	// 1.parse topics
-	numTopic, err := DecodeUvarint(r)
+	numTopic, err := protocol.DecodeUvarint(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode array length: %w", err)
 	}
@@ -47,45 +47,45 @@ func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) 
 	}
 	topics := make([]Topic, numTopic-1)
 	for i := range topics {
-		name, err := DecodeCompactString(r)
+		name, err := protocol.DecodeCompactString(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode topic name: %w", err)
 		}
 		topics[i].Name = name
-		DecodeTaggedField(r)
+		protocol.DecodeTaggedField(r) // Assuming DecodeTaggedField handles potential tagged fields
 	}
 	request.Topics = topics
 
 	// 2.parse response partition limit
-	responsePartitionLimit, err := DecodeInt32(r)
+	responsePartitionLimit, err := protocol.DecodeInt32(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode response partition limit: %w", err)
 	}
 	request.ResponsePartitionLimit = responsePartitionLimit
 
 	// 3.parse cursor
-	request.Cursor = &Cursor{}
-	request.Cursor.TopicName, err = DecodeCompactString(r)
+	nextByte, err := protocol.PeekNextByte(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode cursor topic name: %w", err)
+		return nil, fmt.Errorf("failed to peek next byte: %w", err)
 	}
-	request.Cursor.PartitionIndex, err = DecodeInt32(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode cursor partition index: %w", err)
+	// cursor is null
+	if nextByte == 0xff {
+		// forward the reader to the next byte
+		r.ReadByte()
+	} else {
+		request.Cursor = &Cursor{}
+		request.Cursor.TopicName, err = protocol.DecodeCompactString(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cursor topic name: %w", err)
+		}
+		request.Cursor.PartitionIndex, err = protocol.DecodeInt32(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode cursor partition index: %w", err)
+		}
+
 	}
 
-	DecodeTaggedField(r)
+	protocol.DecodeTaggedField(r) // Assuming DecodeTaggedField handles potential tagged fields
 
 	return request, nil
-}
-
-func HandleDescribeTopic(log *slog.Logger, conn net.Conn, header *RequestHeader) {
-	rd := bufio.NewReader(conn)
-	request, err := DecodeDescribeTopicRequest(rd)
-	if err != nil {
-		log.Error("failed to decode describe topic request", "error", err)
-		return
-	}
-
-	log.Info("Received DescribeTopic request", "topics", request.Topics, "responsePartitionLimit", request.ResponsePartitionLimit, "cursor", request.Cursor)
 }

@@ -2,27 +2,21 @@ package protocol
 
 import (
 	"bufio"
+	"errors"
 	"io"
 	"log/slog"
 	"net"
 )
 
 // RequestHandlerFunc defines the function signature for API handlers
-type RequestHandlerFunc func(log *slog.Logger, conn net.Conn, header *RequestHeader)
+type RequestHandlerFunc func(log *slog.Logger, rd *bufio.Reader, w io.Writer, header *RequestHeader)
 
-// API handlers map
-var ApiHandlers = map[int16]RequestHandlerFunc{
-	ApiKeyApiVersions:             HandleApiVersions,
-	ApiKeyDescribeTopicPartitions: HandleDescribeTopic,
-	// Add more handlers as they are implemented
-}
-
-// HandleConnection processes a Kafka protocol connection, using the provided logger
-func HandleConnection(log *slog.Logger, conn net.Conn) {
+// HandleConnection processes a Kafka protocol connection, using the provided logger and handlers map
+func HandleConnection(log *slog.Logger, conn net.Conn, handlers map[int16]RequestHandlerFunc) {
 	for {
 		length, err := DecodeInt32(conn)
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				log.Debug("Connection closed")
 				return
 			}
@@ -43,20 +37,11 @@ func HandleConnection(log *slog.Logger, conn net.Conn) {
 			"clientID", header.ClientID,
 		)
 
-		if handler, ok := ApiHandlers[header.ApiKey]; ok {
-			handler(log, conn, header)
+		if handler, ok := handlers[header.ApiKey]; ok {
+			handler(log, rd, conn, header)
 		} else {
 			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)
 		}
 
 	} // End of for loop
-}
-
-func HeaderSize(apiKey int16, apiVersion int16) int32 {
-	switch apiKey {
-	case ApiKeyApiVersions:
-		return 10
-	default:
-		return 10
-	}
 }

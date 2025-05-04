@@ -13,6 +13,19 @@ type RequestHeader struct {
 	ClientID      *string
 }
 
+type ResponseHeader struct {
+	CorrelationID int32
+	// tagged fields
+}
+
+func (r *ResponseHeader) Encode(w io.Writer) error {
+	err := EncodeI32(w, r.CorrelationID)
+	if err != nil {
+		return fmt.Errorf("failed to encode correlation id: %w", err)
+	}
+	return EncodeTaggedField(w)
+}
+
 func DecodeRequestHeader(r *bufio.Reader) (*RequestHeader, error) {
 	h := &RequestHeader{}
 	var err error

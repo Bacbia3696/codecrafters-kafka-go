@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/decoder"
@@ -55,6 +56,33 @@ func DecodeRecordHeader(r *bufio.Reader) (*RecordHeader, error) {
 	return header, nil
 }
 
+// decodeSpecificRecordValue is a helper to decode the specific record type from the value bytes.
+func decodeSpecificRecordValue(rd *bufio.Reader, recordType RecordType) (valueEncodedRecord any, valueEncodedRecordType RecordType, err error) {
+	switch recordType {
+	case RecordTypePartition:
+		valueEncodedRecord, err = DecodePartitionRecord(rd)
+		valueEncodedRecordType = RecordTypePartition
+		if err != nil {
+			return nil, 0, err // Return zero value for RecordType on error
+		}
+	case RecordTypeTopic:
+		valueEncodedRecord, err = DecodeTopicRecord(rd)
+		valueEncodedRecordType = RecordTypeTopic
+		if err != nil {
+			return nil, 0, err
+		}
+	case RecordTypeFeatureLevel:
+		valueEncodedRecord, err = DecodeFeatureLevelRecord(rd)
+		valueEncodedRecordType = RecordTypeFeatureLevel
+		if err != nil {
+			return nil, 0, err
+		}
+	default:
+		return nil, 0, fmt.Errorf("invalid record type: %d", recordType)
+	}
+	return valueEncodedRecord, valueEncodedRecordType, nil
+}
+
 func DecodeRecord(r *bufio.Reader) (*Record, error) {
 	record := &Record{}
 	var err error
@@ -82,18 +110,51 @@ func DecodeRecord(r *bufio.Reader) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
+	// encode record.Value
+	rd := bufio.NewReader(bytes.NewReader(record.Value))
+	baseRecord, err := DecodeBaseRecord(rd)
+	if err != nil {
+		return nil, err
+	}
+	record.ValueEncodedBaseRecode = *baseRecord
+
+	// Call the new helper function
+	record.ValueEncodedRecord, record.ValueEncodedRecordType, err = decodeSpecificRecordValue(rd, baseRecord.Type)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode specific record value: %w", err)
+	}
+
+	// finished decode record.Value
 	headerLength, err := decoder.DecodeUvarint(r)
 	if err != nil {
 		return nil, err
 	}
 	if headerLength > 0 {
-		record.Headers = make([]RecordHeader, headerLength-1)
-		for i := range record.Headers {
-			header, err := DecodeRecordHeader(r)
-			if err != nil {
-				return nil, err
+		// The Kafka protocol specifies header count as Uvarint, not Uvarint-1.
+		// If headerLength from DecodeUvarint is 0, it means no headers.
+		// If it's > 0, it's the actual count. Let's assume it's count, not count+1 for now.
+		// If it was count+1, then 0 would mean null, 1 would mean 0 headers.
+		// For safety, let's assume headerLength is the actual count and if it's >0, process.
+		actualHeaderCount := int(headerLength)
+		if headerLength == 0 { // Check if this is how zero headers is represented
+			// No headers, do nothing or ensure record.Headers is nil/empty
+			record.Headers = nil
+		} else {
+			// If Uvarint 0 means null and Uvarint 1 means 0 elements for compact arrays, then:
+			// compact_array_len, err := decoder.DecodeCompactArrayLength(rd) // If using a helper for this
+			// if err == nil && compact_array_len > 0 {
+			//    record.Headers = make([]RecordHeader, compact_array_len)
+			// } else if err != nil { return nil, err }
+			// For now, assuming simple Uvarint count
+
+			record.Headers = make([]RecordHeader, actualHeaderCount)
+			for i := range record.Headers {
+				header, err := DecodeRecordHeader(r) // IMPORTANT: Use original reader 'r', not 'rd' from record.Value
+				if err != nil {
+					return nil, err
+				}
+				record.Headers[i] = *header
 			}
-			record.Headers[i] = *header
 		}
 	}
 	return record, nil
@@ -150,27 +211,21 @@ func DecodeRecordBatch(r *bufio.Reader) (*RecordBatch, error) {
 	if err != nil {
 		return nil, err
 	}
-	lengthRecords, err := decoder.DecodeUvarint(r)
+	var lengthRecords int32
+	err = decoder.DecodeValue(r, &lengthRecords)
 	if err != nil {
 		return nil, err
 	}
 	recordBatch.Records = make([]Record, lengthRecords)
 	for i := range recordBatch.Records {
-		record, err := DecodeRecord(r)
+		recordInternal, err := DecodeRecord(r)
 		if err != nil {
 			return nil, err
 		}
-		recordBatch.Records[i] = *record
+		recordBatch.Records[i] = *recordInternal
 	}
 	return recordBatch, nil
 }
-
-type RecordType int8
-
-const (
-	RecordTypeTopic     RecordType = 2
-	RecordTypePartition RecordType = 3
-)
 
 type BaseRecord struct {
 	FrameVersion int8
@@ -206,6 +261,8 @@ func DecodeRecordType(r *bufio.Reader) (RecordType, error) {
 		return RecordTypeTopic, nil
 	case int8(RecordTypePartition):
 		return RecordTypePartition, nil
+	case int8(RecordTypeFeatureLevel):
+		return RecordTypeFeatureLevel, nil
 	default:
 		return 0, fmt.Errorf("invalid record type: %d", recordType)
 	}

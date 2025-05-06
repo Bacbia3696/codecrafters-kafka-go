@@ -74,6 +74,17 @@ func DecodeValue(r io.Reader, value any) error {
 	return nil
 }
 
+func DecodeCompactArrayLength(r *bufio.Reader) (int, error) {
+	length, err := DecodeUvarint(r)
+	if err != nil {
+		return 0, fmt.Errorf("failed to decode compact array length: %w", err)
+	}
+	if length == 0 {
+		return 0, fmt.Errorf("compact array length is 0")
+	}
+	return int(length - 1), nil
+}
+
 func DecodeTaggedField(r *bufio.Reader) {
 	tag, err := DecodeUvarint(r) // Assumes DecodeUvarint is in this package
 	if err != nil {

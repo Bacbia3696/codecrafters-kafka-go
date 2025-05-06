@@ -38,10 +38,10 @@ import (
 // 		"about": "An epoch that gets incremented each time we change anything in the partition." },
 // 	  { "name": "Directories", "type": "[]uuid", "versions": "1+",
 // 		"about": "The log directory hosting each replica, sorted in the same exact order as the Replicas field."},
+// ======SKIP===============
 // 	  { "name": "EligibleLeaderReplicas", "type": "[]int32", "default": "null", "entityType": "brokerId",
 // 		"versions": "2+", "nullableVersions": "2+", "taggedVersions": "2+", "tag": 1,
 // 		"about": "The eligible leader replicas of this partition." },
-// ======SKIP===============
 // 	  { "name": "LastKnownElr", "type": "[]int32", "default": "null", "entityType": "brokerId",
 // 		"versions": "2+", "nullableVersions": "2+", "taggedVersions": "2+", "tag": 2,
 // 		"about": "The last known eligible leader replicas of this partition." }
@@ -50,18 +50,17 @@ import (
 //   }
 
 type PartitionRecord struct {
-	PartitionId            int32
-	TopicId                uuid.UUID
-	Replicas               []int32
-	Isr                    []int32
-	RemovingReplicas       []int32
-	AddingReplicas         []int32
-	Leader                 int32
-	LeaderRecoveryState    int8
-	LeaderEpoch            int32
-	PartitionEpoch         int32
-	Directories            []uuid.UUID
-	EligibleLeaderReplicas []int32
+	PartitionId      int32
+	TopicId          uuid.UUID
+	Replicas         []int32
+	Isr              []int32
+	RemovingReplicas []int32
+	AddingReplicas   []int32
+	Leader           int32
+	LeaderEpoch      int32
+	PartitionEpoch   int32
+	Directories      []uuid.UUID
+	// EligibleLeaderReplicas []int32
 	// tagged field
 	// LastKnownElr           []int32
 }
@@ -73,9 +72,63 @@ func DecodePartitionRecord(r *bufio.Reader) (*PartitionRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	record.TopicId, err = decoder.DecodeUUID(r)
+	err = decoder.DecodeValue(r, &record.TopicId)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
+	record.Replicas, err = DecodeCompactArrayInt32(r)
+	if err != nil {
+		return nil, err
+	}
+	record.Isr, err = DecodeCompactArrayInt32(r)
+	if err != nil {
+		return nil, err
+	}
+	record.RemovingReplicas, err = DecodeCompactArrayInt32(r)
+	if err != nil {
+		return nil, err
+	}
+	record.AddingReplicas, err = DecodeCompactArrayInt32(r)
+	if err != nil {
+		return nil, err
+	}
+	err = decoder.DecodeValue(r, &record.Leader)
+	if err != nil {
+		return nil, err
+	}
+	err = decoder.DecodeValue(r, &record.LeaderEpoch)
+	if err != nil {
+		return nil, err
+	}
+	err = decoder.DecodeValue(r, &record.PartitionEpoch)
+	if err != nil {
+		return nil, err
+	}
+	directoriesLength, err := decoder.DecodeCompactArrayLength(r)
+	if err != nil {
+		return nil, err
+	}
+	record.Directories = make([]uuid.UUID, directoriesLength)
+	for i := range record.Directories {
+		record.Directories[i], err = decoder.DecodeUUID(r)
+		if err != nil {
+			return nil, err
+		}
+	}
+	decoder.DecodeTaggedField(r)
+	return record, nil
+}
+func DecodeCompactArrayInt32(r *bufio.Reader) ([]int32, error) {
+	length, err := decoder.DecodeCompactArrayLength(r)
+	if err != nil {
+		return nil, err
+	}
+	arr := make([]int32, length)
+	for i := range arr {
+		err = decoder.DecodeValue(r, &arr[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return arr, nil
 }

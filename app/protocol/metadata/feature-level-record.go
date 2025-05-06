@@ -26,11 +26,13 @@ import (
 type FeatureLevelRecord struct {
 	Name         string
 	FeatureLevel int16
+	// tagged field
 }
 
 func DecodeFeatureLevelRecord(r *bufio.Reader) (*FeatureLevelRecord, error) {
 	record := &FeatureLevelRecord{}
-	err := decoder.DecodeValue(r, &record.Name)
+	var err error
+	record.Name, err = decoder.DecodeCompactString(r)
 	if err != nil {
 		return nil, err
 	}
@@ -38,5 +40,6 @@ func DecodeFeatureLevelRecord(r *bufio.Reader) (*FeatureLevelRecord, error) {
 	if err != nil {
 		return nil, err
 	}
+	decoder.DecodeTaggedField(r)
 	return record, nil
 }

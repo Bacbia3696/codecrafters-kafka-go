@@ -29,7 +29,8 @@ type TopicRecord struct {
 
 func DecodeTopicRecord(r *bufio.Reader) (*TopicRecord, error) {
 	record := &TopicRecord{}
-	err := decoder.DecodeValue(r, &record.Name)
+	var err error
+	record.Name, err = decoder.DecodeCompactString(r)
 	if err != nil {
 		return nil, err
 	}
@@ -37,5 +38,6 @@ func DecodeTopicRecord(r *bufio.Reader) (*TopicRecord, error) {
 	if err != nil {
 		return nil, err
 	}
+	decoder.DecodeTaggedField(r)
 	return record, nil
 }

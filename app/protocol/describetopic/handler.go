@@ -25,12 +25,11 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		Topics:       make([]TopicResponse, len(request.Topics)),
 		NextCursor:   nil,
 	}
-	// metadata, err := protocol.ReadClusterMetadata()
-	// if err != nil {
-	// 	log.Error("failed to read cluster metadata", "error", err)
-	// 	return
-	// }
-	// log.Info("Cluster metadata", "metadata", metadata)
+	metadata, err := protocol.ReadClusterMetadata()
+	if err != nil {
+		log.Error("failed to read cluster metadata", "error", err)
+	}
+	log.Info("Cluster metadata", "metadata", metadata)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
 			ErrorCode:  protocol.ErrorCodeUnknownTopic,

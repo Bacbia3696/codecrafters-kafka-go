@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
-	"github.com/google/uuid"
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
+	// protocol may still be needed for specific types if not all moved
+	// "github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/google/uuid" // Assuming this is still relevant for TopicResponse
 )
 
 // This file is reserved for DescribeTopic response structs and encoding logic.
@@ -41,88 +43,79 @@ type PartitionResponse struct {
 
 func (r *Cursor) Encode(w io.Writer) error {
 	if r == nil {
-		return protocol.EncodeValue(w, int8(-1))
+		return encoder.EncodeValue(w, int8(-1))
 	}
-	err := protocol.EncodeCompactString(w, r.TopicName)
+	err := encoder.EncodeCompactString(w, r.TopicName)
 	if err != nil {
 		return fmt.Errorf("failed to encode topic name: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.PartitionIndex)
+	err = encoder.EncodeValue(w, r.PartitionIndex)
 	if err != nil {
 		return fmt.Errorf("failed to encode partition index: %w", err)
 	}
-	return protocol.EncodeTaggedField(w)
+	return encoder.EncodeTaggedField(w)
 }
 
 func (r *PartitionResponse) Encode(w io.Writer) error {
-	// ErrorCode              int16
-	// PartitionIndex         int32
-	// LeaderID               int32
-	// LeaderEpoch            int32
-	// ReplicaNodes           []int32
-	// IsrNodes               []int32
-	// EligibleLeaderReplicas []int32
-	// LastKnownELR           []int32
-	// OfflineReplicas        []int32
-	// TagBuffer
-	err := protocol.EncodeValue(w, r.ErrorCode)
+	err := encoder.EncodeValue(w, r.ErrorCode)
 	if err != nil {
 		return fmt.Errorf("failed to encode error code: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.PartitionIndex)
+	err = encoder.EncodeValue(w, r.PartitionIndex)
 	if err != nil {
 		return fmt.Errorf("failed to encode partition index: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.LeaderID)
+	err = encoder.EncodeValue(w, r.LeaderID)
 	if err != nil {
 		return fmt.Errorf("failed to encode leader id: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.LeaderEpoch)
+	err = encoder.EncodeValue(w, r.LeaderEpoch)
 	if err != nil {
 		return fmt.Errorf("failed to encode leader epoch: %w", err)
 	}
-	err = protocol.EncodeArray(w, r.ReplicaNodes)
+	err = encoder.EncodeInt32Array(w, r.ReplicaNodes)
 	if err != nil {
 		return fmt.Errorf("failed to encode replica nodes: %w", err)
 	}
-	err = protocol.EncodeArray(w, r.IsrNodes)
+	err = encoder.EncodeInt32Array(w, r.IsrNodes)
 	if err != nil {
 		return fmt.Errorf("failed to encode isr nodes: %w", err)
 	}
-	err = protocol.EncodeArray(w, r.EligibleLeaderReplicas)
+	err = encoder.EncodeInt32Array(w, r.EligibleLeaderReplicas)
 	if err != nil {
 		return fmt.Errorf("failed to encode eligible leader replicas: %w", err)
 	}
-	err = protocol.EncodeArray(w, r.LastKnownELR)
+	err = encoder.EncodeInt32Array(w, r.LastKnownELR)
 	if err != nil {
 		return fmt.Errorf("failed to encode last known elr: %w", err)
 	}
-	err = protocol.EncodeArray(w, r.OfflineReplicas)
+	err = encoder.EncodeInt32Array(w, r.OfflineReplicas)
 	if err != nil {
 		return fmt.Errorf("failed to encode offline replicas: %w", err)
 	}
-	return protocol.EncodeTaggedField(w)
+	return encoder.EncodeTaggedField(w)
 }
 
 func (r *TopicResponse) Encode(w io.Writer) error {
-	err := protocol.EncodeValue(w, r.ErrorCode)
+	var err error
+	err = encoder.EncodeValue(w, r.ErrorCode)
 	if err != nil {
 		return fmt.Errorf("failed to encode error code: %w", err)
 	}
-	err = protocol.EncodeCompactString(w, r.Name)
+	err = encoder.EncodeCompactString(w, r.Name)
 	if err != nil {
 		return fmt.Errorf("failed to encode topic name: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.TopicID)
+	err = encoder.EncodeValue(w, r.TopicID)
 	if err != nil {
 		return fmt.Errorf("failed to encode topic id: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.IsInternal)
+	err = encoder.EncodeValue(w, r.IsInternal)
 	if err != nil {
 		return fmt.Errorf("failed to encode is internal: %w", err)
 	}
 	numPartitions := len(r.Partitions)
-	err = protocol.EncodeUvarint(w, uint64(numPartitions+1))
+	err = encoder.EncodeCompactArrayLength(w, numPartitions)
 	for _, p := range r.Partitions {
 		err = p.Encode(w)
 		if err != nil {
@@ -132,20 +125,21 @@ func (r *TopicResponse) Encode(w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode partitions: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.TopicAuthorizedOperations)
+	err = encoder.EncodeValue(w, r.TopicAuthorizedOperations)
 	if err != nil {
 		return fmt.Errorf("failed to encode topic authorized operations: %w", err)
 	}
-	return protocol.EncodeTaggedField(w)
+	return encoder.EncodeTaggedField(w)
 }
 
 func (r *DescribeTopicResponse) Encode(w io.Writer) error {
-	err := protocol.EncodeValue(w, r.ThrottleTime)
+	var err error
+	err = encoder.EncodeValue(w, r.ThrottleTime)
 	if err != nil {
 		return fmt.Errorf("failed to encode throttle time: %w", err)
 	}
 	numTopics := len(r.Topics)
-	err = protocol.EncodeUvarint(w, uint64(numTopics+1))
+	err = encoder.EncodeCompactArrayLength(w, numTopics)
 	if err != nil {
 		return fmt.Errorf("failed to encode number of topics: %w", err)
 	}
@@ -159,5 +153,5 @@ func (r *DescribeTopicResponse) Encode(w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode next cursor: %w", err)
 	}
-	return protocol.EncodeTaggedField(w)
+	return encoder.EncodeTaggedField(w)
 }

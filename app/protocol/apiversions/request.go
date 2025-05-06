@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"fmt"
 
-	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/codecrafters-io/kafka-starter-go/app/decoder"
 )
 
 type ApiVersionsRequest struct {
@@ -15,14 +15,14 @@ type ApiVersionsRequest struct {
 func DecodeApiVersionsRequest(r *bufio.Reader) (*ApiVersionsRequest, error) {
 	request := &ApiVersionsRequest{}
 	var err error
-	request.ClientSoftwareName, err = protocol.DecodeCompactString(r)
+	request.ClientSoftwareName, err = decoder.DecodeCompactString(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_name: %w", err)
 	}
-	request.ClientSoftwareVersion, err = protocol.DecodeCompactString(r)
+	request.ClientSoftwareVersion, err = decoder.DecodeCompactString(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
 	}
-	protocol.DecodeTaggedField(r)
+	decoder.DecodeTaggedField(r)
 	return request, nil
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
 )
 
 type ApiVersion struct {
@@ -23,19 +23,19 @@ type ApiVersionsResponseV3 struct {
 
 func (r *ApiVersion) Encode(w io.Writer) error {
 	var err error
-	err = protocol.EncodeValue(w, r.ApiKey)
+	err = encoder.EncodeValue(w, r.ApiKey)
 	if err != nil {
 		return fmt.Errorf("failed to encode api key: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.MinVersion)
+	err = encoder.EncodeValue(w, r.MinVersion)
 	if err != nil {
 		return fmt.Errorf("failed to encode min version: %w", err)
 	}
-	err = protocol.EncodeValue(w, r.MaxVersion)
+	err = encoder.EncodeValue(w, r.MaxVersion)
 	if err != nil {
 		return fmt.Errorf("failed to encode max version: %w", err)
 	}
-	err = protocol.EncodeTaggedField(w)
+	err = encoder.EncodeTaggedField(w)
 	if err != nil {
 		return fmt.Errorf("failed to encode tagged field: %w", err)
 	}
@@ -43,21 +43,21 @@ func (r *ApiVersion) Encode(w io.Writer) error {
 }
 
 func (r *ApiVersionsResponseV3) Encode(w io.Writer) error {
-	err := protocol.EncodeValue(w, r.ErrorCode)
+	err := encoder.EncodeValue(w, r.ErrorCode)
 	if err != nil {
 		return fmt.Errorf("failed to encode error code: %w", err)
 	}
 	length := len(r.ApiVersions)
-	protocol.EncodeUvarint(w, uint64(length+1))
+	encoder.EncodeUvarint(w, uint64(length+1))
 	for _, apiVersion := range r.ApiVersions {
 		err = apiVersion.Encode(w)
 		if err != nil {
 			return fmt.Errorf("failed to encode api version: %w", err)
 		}
 	}
-	err = protocol.EncodeValue(w, r.ThrottleTimeMs)
+	err = encoder.EncodeValue(w, r.ThrottleTimeMs)
 	if err != nil {
 		return fmt.Errorf("failed to encode throttle time ms: %w", err)
 	}
-	return protocol.EncodeTaggedField(w)
+	return encoder.EncodeTaggedField(w)
 }

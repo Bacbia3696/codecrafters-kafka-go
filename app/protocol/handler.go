@@ -7,6 +7,9 @@ import (
 	"io"
 	"log/slog"
 	"net"
+
+	"github.com/codecrafters-io/kafka-starter-go/app/decoder"
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
 )
 
 // RequestHandlerFunc defines the function signature for API handlers
@@ -15,7 +18,8 @@ type RequestHandlerFunc func(log *slog.Logger, rd *bufio.Reader, w io.Writer, he
 // HandleConnection processes a Kafka protocol connection, using the provided logger and handlers map
 func HandleConnection(log *slog.Logger, conn net.Conn, handlers map[int16]RequestHandlerFunc) {
 	for {
-		length, err := DecodeInt32(conn)
+		var length int32
+		err := decoder.DecodeValue(conn, &length)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				log.Debug("Connection closed")
@@ -41,7 +45,7 @@ func HandleConnection(log *slog.Logger, conn net.Conn, handlers map[int16]Reques
 		var bufWriter = bytes.Buffer{}
 		if handler, ok := handlers[header.ApiKey]; ok {
 			handler(log, rd, &bufWriter, header)
-			EncodeValue(conn, int32(bufWriter.Len()))
+			encoder.EncodeValue(conn, int32(bufWriter.Len()))
 			bufWriter.WriteTo(conn)
 		} else {
 			log.Warn("Unsupported API key", "correlationID", header.CorrelationID, "apiKey", header.ApiKey)

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/metadata"
 	"github.com/google/uuid"
 )
 
@@ -29,7 +30,7 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 	if err != nil {
 		log.Error("failed to read cluster metadata", "error", err)
 	}
-	log.Info("Cluster metadata", "metadata", metadata)
+	topicMap := getMapTopicByName(metadata)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
 			ErrorCode:  protocol.ErrorCodeUnknownTopic,
@@ -37,6 +38,26 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 			TopicID:    uuid.Nil,
 			IsInternal: false,
 			Partitions: []PartitionResponse{},
+		}
+		if topic, ok := topicMap[t.Name]; ok {
+			response.Topics[i].TopicID = topic.TopicId
+			response.Topics[i].ErrorCode = protocol.ErrorCodeNone
+
+			partitions := getPartitionsByTopicId(metadata, topic.TopicId)
+			response.Topics[i].Partitions = make([]PartitionResponse, len(partitions))
+			for j, p := range partitions {
+				response.Topics[i].Partitions[j] = PartitionResponse{
+					ErrorCode:              protocol.ErrorCodeNone,
+					PartitionIndex:         p.PartitionId,
+					LeaderID:               p.Leader,
+					LeaderEpoch:            p.LeaderEpoch,
+					ReplicaNodes:           p.Replicas,
+					IsrNodes:               p.Isr,
+					EligibleLeaderReplicas: []int32{},
+					LastKnownELR:           []int32{},
+					OfflineReplicas:        []int32{},
+				}
+			}
 		}
 	}
 
@@ -51,4 +72,32 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		return
 	}
 	log.Info("Sent DescribeTopic response", "response", response)
+}
+
+func getMapTopicByName(data *protocol.ClusterMetadata) map[string]metadata.TopicRecord {
+	topicMap := make(map[string]metadata.TopicRecord)
+	for _, recordBatch := range data.RecordBatchs {
+		for _, record := range recordBatch.Records {
+			if record.ValueEncodedRecordType == metadata.RecordTypeTopic {
+				topic := record.ValueEncodedRecord.(*metadata.TopicRecord)
+				topicMap[topic.Name] = *topic
+			}
+		}
+	}
+	return topicMap
+}
+
+func getPartitionsByTopicId(data *protocol.ClusterMetadata, topicId uuid.UUID) []metadata.PartitionRecord {
+	partitions := []metadata.PartitionRecord{}
+	for _, recordBatch := range data.RecordBatchs {
+		for _, record := range recordBatch.Records {
+			if record.ValueEncodedRecordType == metadata.RecordTypePartition {
+				partition := record.ValueEncodedRecord.(*metadata.PartitionRecord)
+				if partition.TopicId == topicId {
+					partitions = append(partitions, *partition)
+				}
+			}
+		}
+	}
+	return partitions
 }

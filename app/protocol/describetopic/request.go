@@ -3,6 +3,7 @@ package describetopic
 import (
 	"bufio"
 	"fmt"
+	"log/slog"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/decoder"
 )
@@ -23,6 +24,33 @@ type DescribeTopicRequest struct {
 	// TaggedFields []TaggedField // Assuming TaggedField is defined elsewhere or not needed for decoding
 }
 
+func DecodeCursor(r *bufio.Reader) (*Cursor, error) {
+	next, err := decoder.PeekNextByte(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to peek next byte: %w", err)
+	}
+	if next == 0xff {
+		_, err = r.ReadByte()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read byte: %w", err)
+		}
+		return nil, nil
+	}
+	cursor := &Cursor{}
+	cursor.TopicName, err = decoder.DecodeCompactString(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode cursor topic name: %w", err)
+	}
+	var cursorPartitionIndexInt32 int32
+	err = decoder.DecodeValue(r, &cursorPartitionIndexInt32)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode cursor partition index: %w", err)
+	}
+	cursor.PartitionIndex = cursorPartitionIndexInt32
+	decoder.DecodeTaggedField(r) // Cursor tagged fields
+	return cursor, nil
+}
+
 type Topic struct {
 	Name string
 	// TaggedFields []TaggedField
@@ -35,10 +63,12 @@ type Cursor struct {
 }
 
 func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) {
+	slog.Info("DecodeDescribeTopicRequest")
 	request := &DescribeTopicRequest{}
 
 	// 1.parse topics
 	numTopic, err := decoder.DecodeUvarint(r)
+	slog.Info("numTopic", "numTopic", numTopic)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode array length: %w", err)
 	}
@@ -63,33 +93,11 @@ func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) 
 		return nil, fmt.Errorf("failed to decode response partition limit: %w", err)
 	}
 	request.ResponsePartitionLimit = responsePartitionLimitInt32
-
 	// 3.parse cursor
-	nextByte, err := decoder.PeekNextByte(r)
+	request.Cursor, err = DecodeCursor(r)
 	if err != nil {
-		return nil, fmt.Errorf("failed to peek next byte: %w", err)
+		return nil, fmt.Errorf("failed to decode cursor: %w", err)
 	}
-	if nextByte == 0xff { // check for compact nullable string null (-1 length is 0 in uvarint)
-		_, err = decoder.DecodeUvarint(r) // Consume the null marker (length 0)
-		if err != nil {
-			return nil, fmt.Errorf("failed to consume null cursor marker: %w", err)
-		}
-		request.Cursor = nil
-	} else {
-		request.Cursor = &Cursor{}
-		request.Cursor.TopicName, err = decoder.DecodeCompactString(r)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode cursor topic name: %w", err)
-		}
-		var cursorPartitionIndexInt32 int32
-		err = decoder.DecodeValue(r, &cursorPartitionIndexInt32)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decode cursor partition index: %w", err)
-		}
-		request.Cursor.PartitionIndex = cursorPartitionIndexInt32
-		decoder.DecodeTaggedField(r) // Cursor tagged fields
-	}
-
 	decoder.DecodeTaggedField(r) // Overall request tagged fields
 
 	return request, nil

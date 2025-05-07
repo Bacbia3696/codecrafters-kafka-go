@@ -15,6 +15,7 @@ import (
 var SupportedApiVersions = map[int16]int16{
 	protocol.ApiKeyApiVersions:             4,
 	protocol.ApiKeyDescribeTopicPartitions: 0,
+	protocol.ApiKeyFetch:                   16,
 	// Add more API keys as they are implemented
 }
 

@@ -8,6 +8,10 @@ import (
 
 	"github.com/codecrafters-io/kafka-starter-go/app/config"
 	"github.com/codecrafters-io/kafka-starter-go/app/logger"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/apiversions"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/describetopic"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/fetch"
 	"github.com/codecrafters-io/kafka-starter-go/app/server"
 )
 
@@ -23,8 +27,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create and start server
-	srv := server.New(cfg, log) // Pass the configured logger
+	// Instantiate handlers
+	apiVersionsHandler := apiversions.NewApiVersionsHandler()
+	describeTopicHandler := describetopic.NewDescribeTopicHandler()
+	fetchHandler := fetch.NewFetchHandler()
+
+	// Collect handlers
+	handlers := []protocol.RequestHandler{
+		apiVersionsHandler,
+		describeTopicHandler,
+		fetchHandler,
+		// Add other handlers here as they are created
+	}
+
+	// Create and start server, passing the handlers
+	srv := server.New(cfg, log, handlers) // Pass the configured logger and handlers
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

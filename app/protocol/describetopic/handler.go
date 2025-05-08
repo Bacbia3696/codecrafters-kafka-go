@@ -10,8 +10,22 @@ import (
 	"github.com/google/uuid"
 )
 
-func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Writer, header *protocol.RequestHeader) {
-	log.Info("HandleDescribeTopic")
+// DescribeTopicHandler implements the protocol.RequestHandler interface for DescribeTopic requests.
+type DescribeTopicHandler struct{}
+
+// NewDescribeTopicHandler creates a new handler for DescribeTopic requests.
+func NewDescribeTopicHandler() *DescribeTopicHandler {
+	return &DescribeTopicHandler{}
+}
+
+// ApiKey returns the API key for DescribeTopic requests.
+func (h *DescribeTopicHandler) ApiKey() int16 {
+	return protocol.ApiKeyDescribeTopicPartitions
+}
+
+// Handle handles the DescribeTopic request.
+func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, writer io.Writer, header *protocol.RequestHeader) {
+	log.Info("Handling DescribeTopic request")
 	request, err := DecodeDescribeTopicRequest(reader)
 	if err != nil {
 		log.Error("failed to decode describe topic request", "error", err)
@@ -26,11 +40,12 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		Topics:       make([]TopicResponse, len(request.Topics)),
 		NextCursor:   nil,
 	}
-	metadata, err := protocol.ReadClusterMetadata()
+	clusterMeta, err := protocol.ReadClusterMetadata()
 	if err != nil {
 		log.Error("failed to read cluster metadata", "error", err)
+		// Consider how to handle this error; maybe return an error response to client
 	}
-	topicMap := getMapTopicByName(metadata)
+	topicMap := getMapTopicByName(clusterMeta)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
 			ErrorCode:  protocol.ErrorCodeUnknownTopic,
@@ -43,7 +58,7 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 			response.Topics[i].TopicID = topic.TopicId
 			response.Topics[i].ErrorCode = protocol.ErrorCodeNone
 
-			partitions := getPartitionsByTopicId(metadata, topic.TopicId)
+			partitions := getPartitionsByTopicId(clusterMeta, topic.TopicId)
 			response.Topics[i].Partitions = make([]PartitionResponse, len(partitions))
 			for j, p := range partitions {
 				response.Topics[i].Partitions[j] = PartitionResponse{
@@ -71,7 +86,7 @@ func HandleDescribeTopic(log *slog.Logger, reader *bufio.Reader, writer io.Write
 		log.Error("failed to encode describe topic response", "error", err)
 		return
 	}
-	log.Info("Sent DescribeTopic response", "response", response)
+	log.Info("Sent DescribeTopic response")
 }
 
 func getMapTopicByName(data *protocol.ClusterMetadata) map[string]metadata.TopicRecord {

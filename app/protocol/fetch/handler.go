@@ -58,7 +58,7 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 			Partitions: []PartitionResponse{
 				{
 					PartitionIndex: 0,
-					ErrorCode:      protocol.ErrorCodeUnknownTopicID,
+					ErrorCode:      protocol.ErrorCodeNone,
 					HighWatermark:  0,
 				},
 			},

@@ -94,26 +94,26 @@ func DecodeFetchRequest(r *bufio.Reader) (*FetchRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode topic length: %w", err)
 	}
-	topics := make([]Topic, 0, topicLen)
-	for range topicLen {
+	topics := make([]Topic, topicLen)
+	for i := range topics {
 		topic, err := DecodeTopic(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode topic: %w", err)
 		}
-		topics = append(topics, *topic)
+		topics[i] = *topic
 	}
 	request.Topics = topics
 	topicForgottenLen, err := decoder.DecodeCompactArrayLength(r)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode topic forgotten length: %w", err)
 	}
-	topicForgotten := make([]ForgottenTopicsData, 0, topicForgottenLen)
-	for range topicForgottenLen {
+	topicForgotten := make([]ForgottenTopicsData, topicForgottenLen)
+	for i := range topicForgotten {
 		topic, err := DecodeForgottenTopicsData(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode topic: %w", err)
 		}
-		topicForgotten = append(topicForgotten, *topic)
+		topicForgotten[i] = *topic
 	}
 	request.ForgottenTopicsData = topicForgotten
 	request.RackID, err = decoder.DecodeCompactString(r)

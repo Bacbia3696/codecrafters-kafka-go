@@ -3,9 +3,9 @@ package fetch
 import (
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
+	"github.com/codecrafters-io/kafka-starter-go/app/protocol/metadata"
 	"github.com/google/uuid"
 )
 
@@ -49,7 +49,8 @@ type PartitionResponse struct {
 	LogStartOffset       int64
 	AbortedTransactions  []AbortedTransaction
 	PreferredReadReplica int32
-	Records              []RecordResponse
+	RecordBatchs         []metadata.RecordBatch
+	RecordBatchsRaw      []byte
 	// TaggedFields
 }
 
@@ -59,14 +60,14 @@ type AbortedTransaction struct {
 	// TaggedFields
 }
 
-type RecordResponse struct {
-	Key       []byte
-	Value     []byte
-	Offset    int64
-	Partition int32
-	Timestamp time.Time
-	// TaggedFields
-}
+// type RecordResponse struct {
+// 	Key       []byte
+// 	Value     []byte
+// 	Offset    int64
+// 	Partition int32
+// 	Timestamp time.Time
+// 	// TaggedFields
+// }
 
 func (r *FetchResponse) Encode(w io.Writer) error {
 	var err error
@@ -158,16 +159,24 @@ func (r *PartitionResponse) Encode(w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode preferred read replica: %w", err)
 	}
-	err = encoder.EncodeCompactArrayLength(w, len(r.Records))
+	err = encoder.EncodeCompactArrayLength(w, 1)
 	if err != nil {
-		return fmt.Errorf("failed to encode records length: %w", err)
+		return fmt.Errorf("failed to encode record batchs raw length: %w", err)
 	}
-	for _, record := range r.Records {
-		err = record.Encode(w)
-		if err != nil {
-			return fmt.Errorf("failed to encode record: %w", err)
-		}
+	err = encoder.EncodeValue(w, r.RecordBatchsRaw)
+	if err != nil {
+		return fmt.Errorf("failed to encode record batchs raw: %w", err)
 	}
+	// err = encoder.EncodeCompactArrayLength(w, len(r.RecordBatchs))
+	// if err != nil {
+	// 	return fmt.Errorf("failed to encode records length: %w", err)
+	// }
+	// for _, recordBatch := range r.RecordBatchs {
+	// 	err = recordBatch.Encode(w)
+	// 	if err != nil {
+	// 		return fmt.Errorf("failed to encode record: %w", err)
+	// 	}
+	// }
 	err = encoder.EncodeTaggedField(w)
 	if err != nil {
 		return fmt.Errorf("failed to encode tagged fields: %w", err)
@@ -192,31 +201,31 @@ func (r *AbortedTransaction) Encode(w io.Writer) error {
 	return nil
 }
 
-func (r *RecordResponse) Encode(w io.Writer) error {
-	var err error
-	err = encoder.EncodeValue(w, r.Key)
-	if err != nil {
-		return fmt.Errorf("failed to encode key: %w", err)
-	}
-	err = encoder.EncodeValue(w, r.Value)
-	if err != nil {
-		return fmt.Errorf("failed to encode value: %w", err)
-	}
-	err = encoder.EncodeValue(w, r.Offset)
-	if err != nil {
-		return fmt.Errorf("failed to encode offset: %w", err)
-	}
-	err = encoder.EncodeValue(w, r.Partition)
-	if err != nil {
-		return fmt.Errorf("failed to encode partition: %w", err)
-	}
-	err = encoder.EncodeValue(w, r.Timestamp)
-	if err != nil {
-		return fmt.Errorf("failed to encode timestamp: %w", err)
-	}
-	err = encoder.EncodeTaggedField(w)
-	if err != nil {
-		return fmt.Errorf("failed to encode tagged fields: %w", err)
-	}
-	return nil
-}
+// func (r *RecordResponse) Encode(w io.Writer) error {
+// 	var err error
+// 	err = encoder.EncodeValue(w, r.Key)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode key: %w", err)
+// 	}
+// 	err = encoder.EncodeValue(w, r.Value)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode value: %w", err)
+// 	}
+// 	err = encoder.EncodeValue(w, r.Offset)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode offset: %w", err)
+// 	}
+// 	err = encoder.EncodeValue(w, r.Partition)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode partition: %w", err)
+// 	}
+// 	err = encoder.EncodeValue(w, r.Timestamp)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode timestamp: %w", err)
+// 	}
+// 	err = encoder.EncodeTaggedField(w)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to encode tagged fields: %w", err)
+// 	}
+// 	return nil
+// }

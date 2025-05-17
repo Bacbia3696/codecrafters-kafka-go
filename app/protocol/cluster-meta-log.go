@@ -3,6 +3,7 @@ package protocol
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 
@@ -14,8 +15,28 @@ type ClusterMetadata struct {
 	RecordBatchs []metadata.RecordBatch
 }
 
+const (
+	ClusterMetadataPath = "/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log"
+	TopicLogPath        = "/tmp/kraft-combined-logs/%s-%d/00000000000000000000.log" // topicName, partitionIndex
+)
+
 func ReadClusterMetadata() (*ClusterMetadata, error) {
-	file, err := os.Open("/tmp/kraft-combined-logs/__cluster_metadata-0/00000000000000000000.log")
+	return ReadLogFile(ClusterMetadataPath)
+}
+
+func ReadTopicLogFileRaw(topicName string, partitionIndex int32) ([]byte, error) {
+	filePath := fmt.Sprintf(TopicLogPath, topicName, partitionIndex)
+	fmt.Println("reading file", filePath)
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return io.ReadAll(file)
+}
+
+func ReadLogFile(filePath string) (*ClusterMetadata, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -49,18 +70,18 @@ func GetMapTopicByName(data *ClusterMetadata) map[string]metadata.TopicRecord {
 	return topicMap
 }
 
-func CheckTopicExistById(data *ClusterMetadata, topicId uuid.UUID) bool {
+func GetTopicRecordById(data *ClusterMetadata, topicId uuid.UUID) *metadata.TopicRecord {
 	for _, recordBatch := range data.RecordBatchs {
 		for _, record := range recordBatch.Records {
 			if record.ValueEncodedRecordType == metadata.RecordTypeTopic {
 				topic := record.ValueEncodedRecord.(*metadata.TopicRecord)
 				if topic.TopicId == topicId {
-					return true
+					return topic
 				}
 			}
 		}
 	}
-	return false
+	return nil
 }
 
 func GetPartitionsByTopicId(data *ClusterMetadata, topicId uuid.UUID) []metadata.PartitionRecord {

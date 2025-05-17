@@ -2,6 +2,7 @@ package fetch
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log/slog"
 
@@ -63,10 +64,19 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 				},
 			},
 		}
-		if protocol.CheckTopicExistById(clusterMeta, t.TopicID) {
-			response.Responses[i].Partitions[0].ErrorCode = protocol.ErrorCodeNone
-		} else {
+		topicRecord := protocol.GetTopicRecordById(clusterMeta, t.TopicID)
+		if topicRecord == nil {
 			response.Responses[i].Partitions[0].ErrorCode = protocol.ErrorCodeUnknownTopicID
+		} else {
+			recordBatchsRaw, err := protocol.ReadTopicLogFileRaw(topicRecord.Name, 0)
+			fmt.Printf("raw: %b\n", recordBatchsRaw)
+			if err != nil {
+				log.Error("failed to read topic log", "error", err)
+				// empty records
+				response.Responses[i].Partitions[0].RecordBatchsRaw = []byte{0x01}
+				continue
+			}
+			response.Responses[i].Partitions[0].RecordBatchsRaw = recordBatchsRaw
 		}
 	}
 	err = response.Encode(w)

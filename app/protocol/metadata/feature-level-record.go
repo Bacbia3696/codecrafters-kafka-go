@@ -40,6 +40,6 @@ func DecodeFeatureLevelRecord(r *bufio.Reader) (*FeatureLevelRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return record, nil
 }

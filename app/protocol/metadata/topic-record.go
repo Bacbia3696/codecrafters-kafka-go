@@ -38,6 +38,6 @@ func DecodeTopicRecord(r *bufio.Reader) (*TopicRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return record, nil
 }

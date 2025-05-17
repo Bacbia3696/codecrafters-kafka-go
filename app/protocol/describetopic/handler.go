@@ -48,7 +48,7 @@ func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, wr
 	topicMap := getMapTopicByName(clusterMeta)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
-			ErrorCode:  protocol.ErrorCodeUnknownTopic,
+			ErrorCode:  protocol.ErrorCodeUnknownTopicOrPartition,
 			Name:       t.Name,
 			TopicID:    uuid.Nil,
 			IsInternal: false,

@@ -85,7 +85,7 @@ func DecodeCompactArrayLength(r *bufio.Reader) (int, error) {
 	return int(length - 1), nil
 }
 
-func DecodeTaggedField(r *bufio.Reader) {
+func DecodeEmptyTaggedField(r *bufio.Reader) {
 	tag, err := DecodeUvarint(r) // Assumes DecodeUvarint is in this package
 	if err != nil {
 		panic("failed to decode tag: " + err.Error())

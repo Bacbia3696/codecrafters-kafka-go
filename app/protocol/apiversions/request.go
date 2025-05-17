@@ -23,6 +23,6 @@ func DecodeApiVersionsRequest(r *bufio.Reader) (*ApiVersionsRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client_software_version: %w", err)
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return request, nil
 }

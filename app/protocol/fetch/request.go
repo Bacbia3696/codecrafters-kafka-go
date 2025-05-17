@@ -37,7 +37,7 @@ type FetchRequest struct {
 	SessionID           int32
 	SessionEpoch        int32
 	Topics              []Topic
-	ForgottenTopicsData []Topic
+	ForgottenTopicsData []ForgottenTopicsData
 	RackID              string
 	// TaggedFields
 }
@@ -45,6 +45,12 @@ type FetchRequest struct {
 type Topic struct {
 	TopicID    uuid.UUID
 	Partitions []Partition
+	// TaggedFields
+}
+
+type ForgottenTopicsData struct {
+	TopicID    uuid.UUID
+	Partitions []int32
 	// TaggedFields
 }
 
@@ -89,7 +95,7 @@ func DecodeFetchRequest(r *bufio.Reader) (*FetchRequest, error) {
 		return nil, fmt.Errorf("failed to decode topic length: %w", err)
 	}
 	topics := make([]Topic, 0, topicLen)
-	for range topics {
+	for range topicLen {
 		topic, err := DecodeTopic(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode topic: %w", err)
@@ -101,9 +107,9 @@ func DecodeFetchRequest(r *bufio.Reader) (*FetchRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode topic forgotten length: %w", err)
 	}
-	topicForgotten := make([]Topic, 0, topicForgottenLen)
-	for range topicForgotten {
-		topic, err := DecodeTopic(r)
+	topicForgotten := make([]ForgottenTopicsData, 0, topicForgottenLen)
+	for range topicForgottenLen {
+		topic, err := DecodeForgottenTopicsData(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode topic: %w", err)
 		}
@@ -114,7 +120,7 @@ func DecodeFetchRequest(r *bufio.Reader) (*FetchRequest, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode rack id: %w", err)
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return request, nil
 }
 
@@ -129,15 +135,34 @@ func DecodeTopic(r *bufio.Reader) (*Topic, error) {
 		return nil, fmt.Errorf("failed to decode partition length: %w", err)
 	}
 	partitions := make([]Partition, partitionLen)
-	for i := 0; i < partitionLen; i++ {
+	for i := range partitions {
 		partition, err := DecodePartition(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode partition: %w", err)
 		}
-		partitions = append(partitions, *partition)
+		partitions[i] = *partition
 	}
 	topic.Partitions = partitions
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
+	return topic, nil
+}
+
+func DecodeForgottenTopicsData(r *bufio.Reader) (*ForgottenTopicsData, error) {
+	topic := &ForgottenTopicsData{}
+	err := decoder.DecodeValue(r, &topic.TopicID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode topic id: %w", err)
+	}
+	partitionLen, err := decoder.DecodeCompactArrayLength(r)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode partition length: %w", err)
+	}
+	partitions := make([]int32, partitionLen)
+	for i := range partitions {
+		decoder.DecodeValue(r, &partitions[i])
+	}
+	topic.Partitions = partitions
+	decoder.DecodeEmptyTaggedField(r)
 	return topic, nil
 }
 
@@ -167,6 +192,6 @@ func DecodePartition(r *bufio.Reader) (*Partition, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode partition max bytes: %w", err)
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return partition, nil
 }

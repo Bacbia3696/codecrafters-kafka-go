@@ -15,6 +15,7 @@ type RequestHeader struct {
 	ApiVersion    int16
 	CorrelationID int32
 	ClientID      *string
+	// TaggedFields for request HeaderV2
 }
 
 type ResponseHeaderV0 struct {
@@ -61,7 +62,7 @@ func DecodeRequestHeader(r *bufio.Reader) (*RequestHeader, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode client id: %w", err)
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return h, nil
 }
 

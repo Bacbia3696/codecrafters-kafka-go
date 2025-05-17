@@ -34,16 +34,38 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 	responseHeader := &protocol.ResponseHeaderV1{
 		CorrelationID: header.CorrelationID,
 	}
-	response := &FetchResponse{
-		ThrottleTimeMs: 0,
-		ErrorCode:      protocol.ErrorCodeNone,
-		SessionID:      0,
-		Responses:      make([]TopicResponse, len(request.Topics)),
-	}
 	err = responseHeader.Encode(w)
 	if err != nil {
 		log.Error("failed to encode fetch response header", "error", err)
 		return
+	}
+	var response *FetchResponse
+	if len(request.Topics) == 0 {
+		response = &FetchResponse{
+			ThrottleTimeMs: 0,
+			ErrorCode:      protocol.ErrorCodeNone,
+			SessionID:      0,
+			Responses:      []TopicResponse{},
+		}
+	}
+	if len(request.Topics) == 1 {
+		response = &FetchResponse{
+			ThrottleTimeMs: 0,
+			ErrorCode:      protocol.ErrorCodeNone,
+			SessionID:      0,
+			Responses: []TopicResponse{
+				{
+					TopicID: request.Topics[0].TopicID,
+					Partitions: []PartitionResponse{
+						{
+							PartitionIndex: 0,
+							ErrorCode:      protocol.ErrorCodeUnknownTopicID,
+							HighWatermark:  0,
+						},
+					},
+				},
+			},
+		}
 	}
 	err = response.Encode(w)
 	if err != nil {

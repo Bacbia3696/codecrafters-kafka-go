@@ -47,7 +47,7 @@ func DecodeCursor(r *bufio.Reader) (*Cursor, error) {
 		return nil, fmt.Errorf("failed to decode cursor partition index: %w", err)
 	}
 	cursor.PartitionIndex = cursorPartitionIndexInt32
-	decoder.DecodeTaggedField(r) // Cursor tagged fields
+	decoder.DecodeEmptyTaggedField(r) // Cursor tagged fields
 	return cursor, nil
 }
 
@@ -82,7 +82,7 @@ func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) 
 			return nil, fmt.Errorf("failed to decode topic name: %w", err)
 		}
 		topics[i].Name = name
-		decoder.DecodeTaggedField(r)
+		decoder.DecodeEmptyTaggedField(r)
 	}
 	request.Topics = topics
 
@@ -98,7 +98,7 @@ func DecodeDescribeTopicRequest(r *bufio.Reader) (*DescribeTopicRequest, error) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode cursor: %w", err)
 	}
-	decoder.DecodeTaggedField(r) // Overall request tagged fields
+	decoder.DecodeEmptyTaggedField(r) // Overall request tagged fields
 
 	return request, nil
 }

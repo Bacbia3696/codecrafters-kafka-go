@@ -115,7 +115,7 @@ func DecodePartitionRecord(r *bufio.Reader) (*PartitionRecord, error) {
 			return nil, err
 		}
 	}
-	decoder.DecodeTaggedField(r)
+	decoder.DecodeEmptyTaggedField(r)
 	return record, nil
 }
 func DecodeCompactArrayInt32(r *bufio.Reader) ([]int32, error) {

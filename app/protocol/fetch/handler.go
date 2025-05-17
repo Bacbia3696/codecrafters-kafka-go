@@ -31,15 +31,24 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 	}
 	log.Info("Decoded fetch request", "request", request)
 
-	// TODO: Implement actual fetch logic: reading from topics/partitions
-	// and sending a FetchResponse.
-
-	// For now, let's send a minimal response or nothing, as per current implementation.
-	// Example of sending an empty response (if your protocol expects a response header even for no data):
-	// responseHeader := protocol.ResponseHeaderV0{CorrelationID: header.CorrelationID}
-	// if err := responseHeader.Encode(w); err != nil {
-	// 	log.Error("failed to encode fetch response header", "error", err)
-	// 	return
-	// }
-	// An actual FetchResponse would follow.
+	responseHeader := &protocol.ResponseHeaderV1{
+		CorrelationID: header.CorrelationID,
+	}
+	response := &FetchResponse{
+		ThrottleTimeMs: 0,
+		ErrorCode:      protocol.ErrorCodeNone,
+		SessionID:      0,
+		Responses:      make([]TopicResponse, len(request.Topics)),
+	}
+	err = responseHeader.Encode(w)
+	if err != nil {
+		log.Error("failed to encode fetch response header", "error", err)
+		return
+	}
+	err = response.Encode(w)
+	if err != nil {
+		log.Error("failed to encode fetch response", "error", err)
+		return
+	}
+	log.Info("Sent Fetch response")
 }

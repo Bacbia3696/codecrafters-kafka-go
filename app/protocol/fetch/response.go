@@ -1,8 +1,11 @@
 package fetch
 
 import (
+	"fmt"
+	"io"
 	"time"
 
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
 	"github.com/google/uuid"
 )
 
@@ -63,4 +66,157 @@ type RecordResponse struct {
 	Partition int32
 	Timestamp time.Time
 	// TaggedFields
+}
+
+func (r *FetchResponse) Encode(w io.Writer) error {
+	var err error
+	err = encoder.EncodeValue(w, r.ThrottleTimeMs)
+	if err != nil {
+		return fmt.Errorf("failed to encode throttle time ms: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.ErrorCode)
+	if err != nil {
+		return fmt.Errorf("failed to encode error code: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.SessionID)
+	if err != nil {
+		return fmt.Errorf("failed to encode session id: %w", err)
+	}
+	err = encoder.EncodeCompactArrayLength(w, len(r.Responses))
+	if err != nil {
+		return fmt.Errorf("failed to encode responses length: %w", err)
+	}
+	for _, response := range r.Responses {
+		err = response.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode response: %w", err)
+		}
+	}
+	err = encoder.EncodeTaggedField(w)
+	if err != nil {
+		return fmt.Errorf("failed to encode tagged fields: %w", err)
+	}
+	return nil
+}
+
+func (r *TopicResponse) Encode(w io.Writer) error {
+	var err error
+	err = encoder.EncodeValue(w, r.TopicID)
+	if err != nil {
+		return fmt.Errorf("failed to encode topic id: %w", err)
+	}
+	err = encoder.EncodeCompactArrayLength(w, len(r.Partitions))
+	if err != nil {
+		return fmt.Errorf("failed to encode partitions length: %w", err)
+	}
+	for _, partition := range r.Partitions {
+		err = partition.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode partition: %w", err)
+		}
+	}
+	err = encoder.EncodeTaggedField(w)
+	if err != nil {
+		return fmt.Errorf("failed to encode tagged fields: %w", err)
+	}
+	return nil
+}
+
+func (r *PartitionResponse) Encode(w io.Writer) error {
+	var err error
+	err = encoder.EncodeValue(w, r.PartitionIndex)
+	if err != nil {
+		return fmt.Errorf("failed to encode partition index: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.ErrorCode)
+	if err != nil {
+		return fmt.Errorf("failed to encode error code: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.HighWatermark)
+	if err != nil {
+		return fmt.Errorf("failed to encode high watermark: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.LastStableOffset)
+	if err != nil {
+		return fmt.Errorf("failed to encode last stable offset: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.LogStartOffset)
+	if err != nil {
+		return fmt.Errorf("failed to encode log start offset: %w", err)
+	}
+	err = encoder.EncodeCompactArrayLength(w, len(r.AbortedTransactions))
+	if err != nil {
+		return fmt.Errorf("failed to encode aborted transactions length: %w", err)
+	}
+	for _, abortedTransaction := range r.AbortedTransactions {
+		err = abortedTransaction.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode aborted transaction: %w", err)
+		}
+	}
+	err = encoder.EncodeValue(w, r.PreferredReadReplica)
+	if err != nil {
+		return fmt.Errorf("failed to encode preferred read replica: %w", err)
+	}
+	err = encoder.EncodeCompactArrayLength(w, len(r.Records))
+	if err != nil {
+		return fmt.Errorf("failed to encode records length: %w", err)
+	}
+	for _, record := range r.Records {
+		err = record.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode record: %w", err)
+		}
+	}
+	err = encoder.EncodeTaggedField(w)
+	if err != nil {
+		return fmt.Errorf("failed to encode tagged fields: %w", err)
+	}
+	return nil
+}
+
+func (r *AbortedTransaction) Encode(w io.Writer) error {
+	var err error
+	err = encoder.EncodeValue(w, r.ProducerID)
+	if err != nil {
+		return fmt.Errorf("failed to encode producer id: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.FirstOffset)
+	if err != nil {
+		return fmt.Errorf("failed to encode first offset: %w", err)
+	}
+	err = encoder.EncodeTaggedField(w)
+	if err != nil {
+		return fmt.Errorf("failed to encode tagged fields: %w", err)
+	}
+	return nil
+}
+
+func (r *RecordResponse) Encode(w io.Writer) error {
+	var err error
+	err = encoder.EncodeValue(w, r.Key)
+	if err != nil {
+		return fmt.Errorf("failed to encode key: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Value)
+	if err != nil {
+		return fmt.Errorf("failed to encode value: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Offset)
+	if err != nil {
+		return fmt.Errorf("failed to encode offset: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Partition)
+	if err != nil {
+		return fmt.Errorf("failed to encode partition: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Timestamp)
+	if err != nil {
+		return fmt.Errorf("failed to encode timestamp: %w", err)
+	}
+	err = encoder.EncodeTaggedField(w)
+	if err != nil {
+		return fmt.Errorf("failed to encode tagged fields: %w", err)
+	}
+	return nil
 }

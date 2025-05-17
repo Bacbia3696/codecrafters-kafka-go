@@ -13,8 +13,8 @@ import (
 // SupportedApiVersions maps API keys to their version range
 // Key: ApiKey, Value: MaxVersion (minimum is assumed to be 0 for the *logic*)
 var SupportedApiVersions = map[int16]int16{
-	protocol.ApiKeyApiVersions:             4, // This handler itself supports up to v4
-	protocol.ApiKeyDescribeTopicPartitions: 0, // Example: DescribeTopicPartitions support
+	protocol.ApiKeyApiVersions:             4,  // This handler itself supports up to v4
+	protocol.ApiKeyDescribeTopicPartitions: 0,  // Example: DescribeTopicPartitions support
 	protocol.ApiKeyFetch:                   16, // Example: Fetch support
 	// Add more API keys as they are implemented
 }
@@ -51,7 +51,7 @@ func (h *ApiVersionsHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Wri
 	// According to Kafka protocol, ApiVersions V0-V2 request/response is one way (no client software name/version)
 	// V3 adds client software name/version to request and full list of ApiVersions in response.
 	// V4 is the same as V3 for ApiVersions API itself. We use V3 response format for V3+ requests.
-	if header.ApiVersion >= 3 { // Check if client is requesting V3 or newer
+	if header.ApiVersion == 4 { // Check if client is requesting V3 or newer
 		// Build supported versions from our map
 		keys := slices.Collect(maps.Keys(SupportedApiVersions))
 		slices.Sort(keys)

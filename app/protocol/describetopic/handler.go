@@ -6,7 +6,6 @@ import (
 	"log/slog"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
-	"github.com/codecrafters-io/kafka-starter-go/app/protocol/metadata"
 	"github.com/google/uuid"
 )
 
@@ -45,7 +44,7 @@ func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, wr
 		log.Error("failed to read cluster metadata", "error", err)
 		// Consider how to handle this error; maybe return an error response to client
 	}
-	topicMap := getMapTopicByName(clusterMeta)
+	topicMap := protocol.GetMapTopicByName(clusterMeta)
 	for i, t := range request.Topics {
 		response.Topics[i] = TopicResponse{
 			ErrorCode:  protocol.ErrorCodeUnknownTopicOrPartition,
@@ -58,7 +57,7 @@ func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, wr
 			response.Topics[i].TopicID = topic.TopicId
 			response.Topics[i].ErrorCode = protocol.ErrorCodeNone
 
-			partitions := getPartitionsByTopicId(clusterMeta, topic.TopicId)
+			partitions := protocol.GetPartitionsByTopicId(clusterMeta, topic.TopicId)
 			response.Topics[i].Partitions = make([]PartitionResponse, len(partitions))
 			for j, p := range partitions {
 				response.Topics[i].Partitions[j] = PartitionResponse{
@@ -87,32 +86,4 @@ func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, wr
 		return
 	}
 	log.Info("Sent DescribeTopic response")
-}
-
-func getMapTopicByName(data *protocol.ClusterMetadata) map[string]metadata.TopicRecord {
-	topicMap := make(map[string]metadata.TopicRecord)
-	for _, recordBatch := range data.RecordBatchs {
-		for _, record := range recordBatch.Records {
-			if record.ValueEncodedRecordType == metadata.RecordTypeTopic {
-				topic := record.ValueEncodedRecord.(*metadata.TopicRecord)
-				topicMap[topic.Name] = *topic
-			}
-		}
-	}
-	return topicMap
-}
-
-func getPartitionsByTopicId(data *protocol.ClusterMetadata, topicId uuid.UUID) []metadata.PartitionRecord {
-	partitions := []metadata.PartitionRecord{}
-	for _, recordBatch := range data.RecordBatchs {
-		for _, record := range recordBatch.Records {
-			if record.ValueEncodedRecordType == metadata.RecordTypePartition {
-				partition := record.ValueEncodedRecord.(*metadata.PartitionRecord)
-				if partition.TopicId == topicId {
-					partitions = append(partitions, *partition)
-				}
-			}
-		}
-	}
-	return partitions
 }

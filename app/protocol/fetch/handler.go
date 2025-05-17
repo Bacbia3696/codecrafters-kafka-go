@@ -39,32 +39,34 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 		log.Error("failed to encode fetch response header", "error", err)
 		return
 	}
-	var response *FetchResponse
-	if len(request.Topics) == 0 {
-		response = &FetchResponse{
-			ThrottleTimeMs: 0,
-			ErrorCode:      protocol.ErrorCodeNone,
-			SessionID:      0,
-			Responses:      []TopicResponse{},
-		}
+
+	clusterMeta, err := protocol.ReadClusterMetadata()
+	if err != nil {
+		log.Error("failed to read cluster metadata", "error", err)
+		// Consider how to handle this error; maybe return an error response to client
 	}
-	if len(request.Topics) == 1 {
-		response = &FetchResponse{
-			ThrottleTimeMs: 0,
-			ErrorCode:      protocol.ErrorCodeNone,
-			SessionID:      0,
-			Responses: []TopicResponse{
+
+	response := &FetchResponse{
+		ThrottleTimeMs: 0,
+		ErrorCode:      protocol.ErrorCodeNone,
+		SessionID:      0,
+		Responses:      make([]TopicResponse, len(request.Topics)),
+	}
+	for i, t := range request.Topics {
+		response.Responses[i] = TopicResponse{
+			TopicID: t.TopicID,
+			Partitions: []PartitionResponse{
 				{
-					TopicID: request.Topics[0].TopicID,
-					Partitions: []PartitionResponse{
-						{
-							PartitionIndex: 0,
-							ErrorCode:      protocol.ErrorCodeUnknownTopicID,
-							HighWatermark:  0,
-						},
-					},
+					PartitionIndex: 0,
+					ErrorCode:      protocol.ErrorCodeUnknownTopicID,
+					HighWatermark:  0,
 				},
 			},
+		}
+		if protocol.CheckTopicExistById(clusterMeta, t.TopicID) {
+			response.Responses[i].Partitions[0].ErrorCode = protocol.ErrorCodeNone
+		} else {
+			response.Responses[i].Partitions[0].ErrorCode = protocol.ErrorCodeUnknownTopicID
 		}
 	}
 	err = response.Encode(w)

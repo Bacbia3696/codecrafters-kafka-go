@@ -25,6 +25,21 @@ func EncodeCompactString(w io.Writer, s string) error {
 	return nil
 }
 
+func EncodeSpecialBytes(w io.Writer, b []byte) error {
+	if b == nil {
+		return EncodeVarint(w, -1)
+	}
+	err := EncodeVarint(w, int64(len(b)))
+	if err != nil {
+		return fmt.Errorf("failed to encode special bytes length: %w", err)
+	}
+	_, err = w.Write(b)
+	if err != nil {
+		return fmt.Errorf("failed to encode special bytes: %w", err)
+	}
+	return nil
+}
+
 // EncodeCompactNullableString encodes a nullable string using the compact format.
 // A nil string is encoded as Uvarint 0 length.
 func EncodeCompactNullableString(w io.Writer, s *string) error {
@@ -54,17 +69,11 @@ func EncodeUvarint(w io.Writer, value uint64) error {
 	return err
 }
 
-// EncodeVarint encodes an int32 into Kafka's unsigned varint format (different from EncodeUvarint which writes to io.Writer).
-// Returns the byte slice.
-func EncodeVarint(value int32) []byte {
-	var buf []byte
-	uv := uint32(value)
-	for uv >= 0x80 {
-		buf = append(buf, byte(uv)|0x80)
-		uv >>= 7
-	}
-	buf = append(buf, byte(uv))
-	return buf
+func EncodeVarint(w io.Writer, value int64) error {
+	buf := make([]byte, binary.MaxVarintLen32)
+	n := binary.PutVarint(buf, value)
+	_, err := w.Write(buf[:n])
+	return err
 }
 
 // EncodeCompactArrayLength encodes the length for a compact array.

@@ -159,10 +159,6 @@ func (r *PartitionResponse) Encode(w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("failed to encode preferred read replica: %w", err)
 	}
-	err = encoder.EncodeCompactArrayLength(w, 1)
-	if err != nil {
-		return fmt.Errorf("failed to encode record batchs raw length: %w", err)
-	}
 	err = encoder.EncodeValue(w, r.RecordBatchsRaw)
 	if err != nil {
 		return fmt.Errorf("failed to encode record batchs raw: %w", err)

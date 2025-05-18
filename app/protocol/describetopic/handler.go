@@ -42,7 +42,7 @@ func (h *DescribeTopicHandler) Handle(log *slog.Logger, reader *bufio.Reader, wr
 	clusterMeta, err := protocol.ReadClusterMetadata()
 	if err != nil {
 		log.Error("failed to read cluster metadata", "error", err)
-		// Consider how to handle this error; maybe return an error response to client
+		return
 	}
 	topicMap := protocol.GetMapTopicByName(clusterMeta)
 	for i, t := range request.Topics {

@@ -2,10 +2,11 @@ package fetch
 
 import (
 	"bufio"
-	"fmt"
+	"bytes"
 	"io"
 	"log/slog"
 
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
 	"github.com/codecrafters-io/kafka-starter-go/app/protocol"
 )
 
@@ -44,7 +45,7 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 	clusterMeta, err := protocol.ReadClusterMetadata()
 	if err != nil {
 		log.Error("failed to read cluster metadata", "error", err)
-		// Consider how to handle this error; maybe return an error response to client
+		return
 	}
 
 	response := &FetchResponse{
@@ -58,7 +59,7 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 			TopicID: t.TopicID,
 			Partitions: []PartitionResponse{
 				{
-					PartitionIndex: 0,
+					PartitionIndex: request.Topics[0].Partitions[0].PartitionID,
 					ErrorCode:      protocol.ErrorCodeNone,
 					HighWatermark:  0,
 				},
@@ -66,18 +67,41 @@ func (h *FetchHandler) Handle(log *slog.Logger, rd *bufio.Reader, w io.Writer, h
 		}
 		topicRecord := protocol.GetTopicRecordById(clusterMeta, t.TopicID)
 		if topicRecord == nil {
+			log.Info("unknown topic", "topicID", t.TopicID)
+			response.Responses[i].Partitions[0].RecordBatchsRaw = []byte{0x01}
 			response.Responses[i].Partitions[0].ErrorCode = protocol.ErrorCodeUnknownTopicID
 		} else {
-			recordBatchsRaw, err := protocol.ReadTopicLogFileRaw(topicRecord.Name, 0)
-			fmt.Printf("raw: %b\n", recordBatchsRaw)
+			recordBatchs, err := protocol.ReadTopicLogFile(topicRecord.Name, request.Topics[i].Partitions[0].PartitionID)
 			if err != nil {
 				log.Error("failed to read topic log", "error", err)
-				// empty records
+				// empty topic
 				response.Responses[i].Partitions[0].RecordBatchsRaw = []byte{0x01}
 				continue
 			}
-			response.Responses[i].Partitions[0].RecordBatchsRaw = recordBatchsRaw
+			raw, err := protocol.ReadTopicLogFileRaw(topicRecord.Name, request.Topics[i].Partitions[0].PartitionID)
+			log.Info("read topic log file", "topicName", topicRecord.Name, "partitionID", request.Topics[i].Partitions[0].PartitionID, "recordBatchs", recordBatchs)
+			if err != nil {
+				log.Error("failed to read topic log", "error", err)
+				continue
+			}
+			log.Info("raw raw", "raw", raw)
+			bufWriter := bytes.NewBuffer(nil)
+			err = encoder.EncodeCompactArrayLength(bufWriter, len(recordBatchs.RecordBatchs))
+			if err != nil {
+				log.Error("failed to encode record batchs length", "error", err)
+				return
+			}
+			// bufWriter.Write(raw)
+			for _, recordBatch := range recordBatchs.RecordBatchs {
+				err = recordBatch.Encode(bufWriter)
+				if err != nil {
+					log.Error("failed to encode record batch", "error", err)
+					return
+				}
+			}
+			response.Responses[i].Partitions[0].RecordBatchsRaw = bufWriter.Bytes()
 		}
+		log.Info("response", "response", response.Responses[i], "t", t, "topicRecord", topicRecord)
 	}
 	err = response.Encode(w)
 	if err != nil {

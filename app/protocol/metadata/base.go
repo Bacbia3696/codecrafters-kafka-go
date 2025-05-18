@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 
 	"github.com/codecrafters-io/kafka-starter-go/app/decoder"
+	"github.com/codecrafters-io/kafka-starter-go/app/encoder"
 )
 
 type RecordBatch struct {
@@ -40,6 +42,118 @@ type Record struct {
 type RecordHeader struct {
 	Key   string
 	Value []byte
+}
+
+func (r *RecordHeader) Encode(w io.Writer) error {
+	err := encoder.EncodeCompactString(w, r.Key)
+	if err != nil {
+		return fmt.Errorf("failed to encode key: %w", err)
+	}
+	err = encoder.EncodeSpecialBytes(w, r.Value)
+	if err != nil {
+		return fmt.Errorf("failed to encode value: %w", err)
+	}
+	return nil
+}
+
+func (r *Record) Encode(w io.Writer) error {
+	err := encoder.EncodeVarint(w, r.Length)
+	if err != nil {
+		return fmt.Errorf("failed to encode length: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Attributes)
+	if err != nil {
+		return fmt.Errorf("failed to encode attributes: %w", err)
+	}
+	err = encoder.EncodeVarint(w, r.TimestampDelta)
+	if err != nil {
+		return fmt.Errorf("failed to encode timestamp delta: %w", err)
+	}
+	err = encoder.EncodeVarint(w, r.OffsetDelta)
+	if err != nil {
+		return fmt.Errorf("failed to encode offset delta: %w", err)
+	}
+	err = encoder.EncodeSpecialBytes(w, r.Key)
+	if err != nil {
+		return fmt.Errorf("failed to encode key: %w", err)
+	}
+	err = encoder.EncodeSpecialBytes(w, r.Value)
+	if err != nil {
+		return fmt.Errorf("failed to encode value: %w", err)
+	}
+	err = encoder.EncodeUvarint(w, uint64(len(r.Headers)))
+	if err != nil {
+		return fmt.Errorf("failed to encode headers length: %w", err)
+	}
+	for _, header := range r.Headers {
+		err = header.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode header: %w", err)
+		}
+	}
+	return nil
+}
+
+func (r *RecordBatch) Encode(w io.Writer) error {
+	err := encoder.EncodeValue(w, r.BaseOffset)
+	if err != nil {
+		return fmt.Errorf("failed to encode base offset: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.BatchLength)
+	if err != nil {
+		return fmt.Errorf("failed to encode batch length: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.PartitionLeaderEpoch)
+	if err != nil {
+		return fmt.Errorf("failed to encode partition leader epoch: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Magic)
+	if err != nil {
+		return fmt.Errorf("failed to encode magic: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.CRC)
+	if err != nil {
+		return fmt.Errorf("failed to encode crc: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.Attributes)
+	if err != nil {
+		return fmt.Errorf("failed to encode attributes: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.LastOffsetDelta)
+	if err != nil {
+		return fmt.Errorf("failed to encode last offset delta: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.FirstTimestamp)
+	if err != nil {
+		return fmt.Errorf("failed to encode first timestamp: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.MaxTimestamp)
+	if err != nil {
+		return fmt.Errorf("failed to encode max timestamp: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.ProducerId)
+	if err != nil {
+		return fmt.Errorf("failed to encode producer id: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.ProducerEpoch)
+	if err != nil {
+		return fmt.Errorf("failed to encode producer epoch: %w", err)
+	}
+	err = encoder.EncodeValue(w, r.BaseSequence)
+	if err != nil {
+		return fmt.Errorf("failed to encode base sequence: %w", err)
+	}
+	err = encoder.EncodeValue(w, int32(len(r.Records)))
+	if err != nil {
+		return fmt.Errorf("failed to encode records length: %w", err)
+	}
+	for _, record := range r.Records {
+		err = record.Encode(w)
+		if err != nil {
+			return fmt.Errorf("failed to encode record: %w", err)
+		}
+	}
+	return nil
 }
 
 func DecodeRecordHeader(r *bufio.Reader) (*RecordHeader, error) {
@@ -83,7 +197,7 @@ func decodeSpecificRecordValue(rd *bufio.Reader, recordType RecordType) (valueEn
 	return valueEncodedRecord, valueEncodedRecordType, nil
 }
 
-func DecodeRecord(r *bufio.Reader) (*Record, error) {
+func DecodeRecord(r *bufio.Reader, shouldDecodeValue bool) (*Record, error) {
 	record := &Record{}
 	var err error
 	record.Length, err = decoder.DecodeVarint(r)
@@ -110,18 +224,22 @@ func DecodeRecord(r *bufio.Reader) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	// encode record.Value
-	rd := bufio.NewReader(bytes.NewReader(record.Value))
-	baseRecord, err := DecodeBaseRecord(rd)
-	if err != nil {
-		return nil, err
-	}
-	record.ValueEncodedBaseRecode = *baseRecord
+	if shouldDecodeValue {
+		// encode record.Value
+		rd := bufio.NewReader(bytes.NewReader(record.Value))
+		baseRecord, err := DecodeBaseRecord(rd)
+		if err != nil {
+			return nil, err
+		}
+		record.ValueEncodedBaseRecode = *baseRecord
 
-	// Call the new helper function
-	record.ValueEncodedRecord, record.ValueEncodedRecordType, err = decodeSpecificRecordValue(rd, baseRecord.Type)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode specific record value: %w", err)
+		// Call the new helper function
+		record.ValueEncodedRecord, record.ValueEncodedRecordType, err = decodeSpecificRecordValue(rd, baseRecord.Type)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode specific record value: %w", err)
+		}
+	} else {
+		fmt.Println("STRING", string(record.Value))
 	}
 
 	// finished decode record.Value
@@ -160,7 +278,7 @@ func DecodeRecord(r *bufio.Reader) (*Record, error) {
 	return record, nil
 }
 
-func DecodeRecordBatch(r *bufio.Reader) (*RecordBatch, error) {
+func DecodeRecordBatch(r *bufio.Reader, shouldDecodeValue bool) (*RecordBatch, error) {
 	recordBatch := &RecordBatch{}
 	var err error
 	err = decoder.DecodeValue(r, &recordBatch.BaseOffset)
@@ -218,7 +336,7 @@ func DecodeRecordBatch(r *bufio.Reader) (*RecordBatch, error) {
 	}
 	recordBatch.Records = make([]Record, lengthRecords)
 	for i := range recordBatch.Records {
-		recordInternal, err := DecodeRecord(r)
+		recordInternal, err := DecodeRecord(r, shouldDecodeValue)
 		if err != nil {
 			return nil, err
 		}

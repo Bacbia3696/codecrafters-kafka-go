@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -21,12 +22,16 @@ const (
 )
 
 func ReadClusterMetadata() (*ClusterMetadata, error) {
-	return ReadLogFile(ClusterMetadataPath)
+	return ReadLogFile(ClusterMetadataPath, true)
+}
+
+func ReadTopicLogFile(topicName string, partitionIndex int32) (*ClusterMetadata, error) {
+	filePath := fmt.Sprintf(TopicLogPath, topicName, partitionIndex)
+	return ReadLogFile(filePath, false)
 }
 
 func ReadTopicLogFileRaw(topicName string, partitionIndex int32) ([]byte, error) {
 	filePath := fmt.Sprintf(TopicLogPath, topicName, partitionIndex)
-	fmt.Println("reading file", filePath)
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -35,26 +40,18 @@ func ReadTopicLogFileRaw(topicName string, partitionIndex int32) ([]byte, error)
 	return io.ReadAll(file)
 }
 
-func ReadLogFile(filePath string) (*ClusterMetadata, error) {
+func ReadLogFile(filePath string, shouldDecodeValue bool) (*ClusterMetadata, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	reader := bufio.NewReader(file)
-	clusterMetadata := &ClusterMetadata{}
-	for {
-		recordBatch, err := metadata.DecodeRecordBatch(reader)
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return nil, err
-		}
-		clusterMetadata.RecordBatchs = append(clusterMetadata.RecordBatchs, *recordBatch)
+	allBytes, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
 	}
-	return clusterMetadata, nil
+	return DecodeClusterMetadata(allBytes, shouldDecodeValue)
 }
 
 func GetMapTopicByName(data *ClusterMetadata) map[string]metadata.TopicRecord {
@@ -97,4 +94,20 @@ func GetPartitionsByTopicId(data *ClusterMetadata, topicId uuid.UUID) []metadata
 		}
 	}
 	return partitions
+}
+
+func DecodeClusterMetadata(data []byte, shouldDecodeValue bool) (*ClusterMetadata, error) {
+	reader := bufio.NewReader(bytes.NewReader(data))
+	clusterMetadata := &ClusterMetadata{}
+	for {
+		recordBatch, err := metadata.DecodeRecordBatch(reader, shouldDecodeValue)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+		clusterMetadata.RecordBatchs = append(clusterMetadata.RecordBatchs, *recordBatch)
+	}
+	return clusterMetadata, nil
 }
